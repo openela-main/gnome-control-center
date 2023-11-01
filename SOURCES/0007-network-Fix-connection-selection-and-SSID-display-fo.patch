@@ -1,0 +1,216 @@
+From e6cebd2fc9b0d18a92f2935e23551b62a7031236 Mon Sep 17 00:00:00 2001
+From: Benjamin Berg <bberg@redhat.com>
+Date: Tue, 4 Jan 2022 11:29:25 +0100
+Subject: [PATCH 7/8] network: Fix connection selection and SSID display for
+ OWE
+
+When dealing with OWE APs, we need to use the SSID from the connection
+rather than the AP. In this case, we want to group the current AP with
+other APs that have the connection SSID.
+
+As such, first change the unqiue AP selection to take the active AP and
+active connection into account (preferring the active AP for correct
+signal strength display).
+
+Then, make sure we have the active connection in the list everywhere and
+skip the SSID check when assiging the AP to the connection for the
+active AP/connection.
+
+This way we make sure to have the active connection together with the
+active AP in the list. The code will prefer to display the connections
+SSID rather than the APS, so we get the right one for OWE.
+
+This mimicks the behaviour of newer g-c-c versions without pulling in
+the full rewrite of the connection list widget.
+---
+ panels/network/net-device-wifi.c | 86 ++++++++++++++++++++++++++------
+ 1 file changed, 72 insertions(+), 14 deletions(-)
+
+diff --git a/panels/network/net-device-wifi.c b/panels/network/net-device-wifi.c
+index fc2fba63f..af489afcc 100644
+--- a/panels/network/net-device-wifi.c
++++ b/panels/network/net-device-wifi.c
+@@ -163,25 +163,50 @@ get_access_point_security (NMAccessPoint *ap)
+ }
+ 
+ static GPtrArray *
+-panel_get_strongest_unique_aps (const GPtrArray *aps)
++panel_get_strongest_unique_aps (NMDevice *nm_device)
+ {
+-        GBytes *ssid, *ssid_tmp;
++        const GPtrArray *aps;
+         GPtrArray *aps_unique = NULL;
+         gboolean add_ap;
+         guint i;
+         guint j;
+         NMAccessPoint *ap;
+         NMAccessPoint *ap_tmp;
++        NMAccessPoint *active_ap;
++        NMActiveConnection *ac;
++        NMConnection *ac_con = NULL;
++        GBytes *ac_ssid = NULL;
++
++        aps = nm_device_wifi_get_access_points (NM_DEVICE_WIFI (nm_device));
++        active_ap = nm_device_wifi_get_active_access_point (NM_DEVICE_WIFI (nm_device));
++
++        /* Use the connection SSID for the active AP as it is different with OWE. */
++        ac = nm_device_get_active_connection (nm_device);
++        if (ac)
++                ac_con = NM_CONNECTION (nm_active_connection_get_connection (ac));
++        if (ac_con) {
++                NMSetting *setting;
++
++                setting = nm_connection_get_setting_by_name (ac_con, NM_SETTING_WIRELESS_SETTING_NAME);
++                if (setting)
++                        ac_ssid = nm_setting_wireless_get_ssid (NM_SETTING_WIRELESS (setting));
++        }
+ 
+         /* we will have multiple entries for typical hotspots, just
+          * filter to the one with the strongest signal */
+         aps_unique = g_ptr_array_new_with_free_func ((GDestroyNotify) g_object_unref);
+         if (aps != NULL)
+                 for (i = 0; i < aps->len; i++) {
++                        GBytes *ssid = NULL;
++
+                         ap = NM_ACCESS_POINT (g_ptr_array_index (aps, i));
+ 
++                        if (ap == active_ap)
++                                ssid = ac_ssid;
++                        if (!ssid)
++                                ssid = nm_access_point_get_ssid (ap);
++
+                         /* Hidden SSIDs don't get shown in the list */
+-                        ssid = nm_access_point_get_ssid (ap);
+                         if (!ssid)
+                                 continue;
+ 
+@@ -189,8 +214,15 @@ panel_get_strongest_unique_aps (const GPtrArray *aps)
+ 
+                         /* get already added list */
+                         for (j=0; j<aps_unique->len; j++) {
++                                GBytes *ssid_tmp = NULL;
++
+                                 ap_tmp = NM_ACCESS_POINT (g_ptr_array_index (aps_unique, j));
+-                                ssid_tmp = nm_access_point_get_ssid (ap_tmp);
++
++                                ssid_tmp = NULL;
++                                if (ap_tmp == active_ap)
++                                        ssid_tmp = ac_ssid;
++                                if (!ssid_tmp)
++                                        ssid_tmp = nm_access_point_get_ssid (ap_tmp);
+                                 g_assert (ssid_tmp);
+ 
+                                 /* is this the same type and data? */
+@@ -202,9 +234,12 @@ panel_get_strongest_unique_aps (const GPtrArray *aps)
+                                                  nm_utils_escape_ssid (g_bytes_get_data (ssid_tmp, NULL),
+                                                                        g_bytes_get_size (ssid_tmp)));
+ 
+-                                        /* the new access point is stronger */
+-                                        if (nm_access_point_get_strength (ap) >
++                                        if (ap_tmp == active_ap) {
++                                                add_ap = FALSE;
++                                        } else if (ap == active_ap ||
++                                            nm_access_point_get_strength (ap) >
+                                             nm_access_point_get_strength (ap_tmp)) {
++                                                /* the new access point is the default or stronger */
+                                                 g_debug ("removing %s",
+                                                          nm_utils_escape_ssid (g_bytes_get_data (ssid_tmp, NULL),
+                                                                                g_bytes_get_size (ssid_tmp)));
+@@ -2042,9 +2077,10 @@ open_history (NetDeviceWifi *device_wifi)
+         GtkWidget *separator;
+         GSList *connections;
+         GSList *l;
+-        const GPtrArray *aps;
+         GPtrArray *aps_unique = NULL;
+         NMAccessPoint *active_ap;
++        NMActiveConnection *ac;
++        NMConnection *ac_con = NULL;
+         guint i;
+         NMDevice *nm_device;
+         GtkWidget *list;
+@@ -2119,10 +2155,15 @@ open_history (NetDeviceWifi *device_wifi)
+ 
+         connections = net_device_get_valid_connections (NET_DEVICE (device_wifi));
+ 
+-        aps = nm_device_wifi_get_access_points (NM_DEVICE_WIFI (nm_device));
+-        aps_unique = panel_get_strongest_unique_aps (aps);
++        aps_unique = panel_get_strongest_unique_aps (nm_device);
+         active_ap = nm_device_wifi_get_active_access_point (NM_DEVICE_WIFI (nm_device));
+ 
++        ac = nm_device_get_active_connection (nm_device);
++        if (ac)
++                ac_con = NM_CONNECTION (nm_active_connection_get_connection (ac));
++        if (ac_con && !g_slist_find (connections, ac_con))
++                connections = g_slist_prepend (connections, ac_con);
++
+         for (l = connections; l; l = l->next) {
+                 NMConnection *connection = l->data;
+                 NMAccessPoint *ap = NULL;
+@@ -2137,7 +2178,13 @@ open_history (NetDeviceWifi *device_wifi)
+                         GBytes *ssid_ap;
+                         ap = NM_ACCESS_POINT (g_ptr_array_index (aps_unique, i));
+                         ssid_ap = nm_access_point_get_ssid (ap);
+-                        if (nm_utils_same_ssid (g_bytes_get_data (ssid, NULL), g_bytes_get_size (ssid),
++
++                        /* Skip SSID check for active connection/AP (will not match with OWE) */
++                        if (ap == active_ap && connection == ac_con)
++                                break;
++
++                        if (ssid_ap &&
++                            nm_utils_same_ssid (g_bytes_get_data (ssid, NULL), g_bytes_get_size (ssid),
+                                                 g_bytes_get_data (ssid_ap, NULL), g_bytes_get_size (ssid_ap),
+                                                 TRUE))
+                                 break;
+@@ -2167,13 +2214,14 @@ populate_ap_list_idle (NetDeviceWifi *device_wifi)
+         NMDevice *nm_device;
+         GSList *connections;
+         GSList *l;
+-        const GPtrArray *aps;
+         GPtrArray *aps_unique = NULL;
+         NMAccessPoint *active_ap;
+         guint i;
+         GtkWidget *row;
+         GtkWidget *button;
+         GList *children, *child;
++        NMActiveConnection *ac;
++        NMConnection *ac_con = NULL;
+ 
+         device_wifi->priv->populate_ap_list_idle_id = 0;
+ 
+@@ -2192,10 +2240,15 @@ populate_ap_list_idle (NetDeviceWifi *device_wifi)
+ 
+         connections = net_device_get_valid_connections (NET_DEVICE (device_wifi));
+ 
+-        aps = nm_device_wifi_get_access_points (NM_DEVICE_WIFI (nm_device));
+-        aps_unique = panel_get_strongest_unique_aps (aps);
++        aps_unique = panel_get_strongest_unique_aps (nm_device);
+         active_ap = nm_device_wifi_get_active_access_point (NM_DEVICE_WIFI (nm_device));
+ 
++        ac = nm_device_get_active_connection (nm_device);
++        if (ac)
++                ac_con = NM_CONNECTION (nm_active_connection_get_connection (ac));
++        if (ac_con && !g_slist_find (connections, ac_con))
++                connections = g_slist_prepend (connections, ac_con);
++
+         for (i = 0; i < aps_unique->len; i++) {
+                 GBytes *ssid_ap;
+                 NMAccessPoint *ap;
+@@ -2212,9 +2265,14 @@ populate_ap_list_idle (NetDeviceWifi *device_wifi)
+                                 continue;
+                         }
+ 
++                        /* Skip SSID check for active connection/AP (will not match with OWE) */
++                        if (ap == active_ap && connection == ac_con)
++                                break;
++
+                         setting = nm_connection_get_setting_by_name (connection, NM_SETTING_WIRELESS_SETTING_NAME);
+                         ssid = nm_setting_wireless_get_ssid (NM_SETTING_WIRELESS (setting));
+-                        if (nm_utils_same_ssid (g_bytes_get_data (ssid, NULL), g_bytes_get_size (ssid),
++                        if (ssid_ap &&
++                            nm_utils_same_ssid (g_bytes_get_data (ssid, NULL), g_bytes_get_size (ssid),
+                                                 g_bytes_get_data (ssid_ap, NULL), g_bytes_get_size (ssid_ap),
+                                                 TRUE))
+                                 break;
+-- 
+2.34.1
+

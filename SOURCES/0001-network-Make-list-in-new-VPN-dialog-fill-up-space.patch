@@ -1,0 +1,27 @@
+From 5e0840c52fc5a3e2334ef3a50aa15e320f2f074e Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Fri, 29 Nov 2019 20:45:32 +0100
+Subject: [PATCH] network: Make list in "new VPN" dialog fill up space
+
+If we don't have much content on it (Due to lack of VPN NM modules),
+the list will look oddly centered. Have it fill the available space.
+---
+ panels/network/connection-editor/connection-editor.ui | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/panels/network/connection-editor/connection-editor.ui b/panels/network/connection-editor/connection-editor.ui
+index 4495c728d..9214b6463 100644
+--- a/panels/network/connection-editor/connection-editor.ui
++++ b/panels/network/connection-editor/connection-editor.ui
+@@ -93,7 +93,7 @@
+                   </object>
+                   <packing>
+                     <property name="expand">True</property>
+-                    <property name="fill">False</property>
++                    <property name="fill">True</property>
+                     <property name="position">0</property>
+                   </packing>
+                 </child>
+-- 
+2.24.0
+

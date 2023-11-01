@@ -1,0 +1,42 @@
+From 0904ae538704409c19c08c88957ff4283d4a152d Mon Sep 17 00:00:00 2001
+From: Benjamin Berg <bberg@redhat.com>
+Date: Tue, 2 Feb 2021 17:27:05 +0100
+Subject: [PATCH 4/8] net-device-wifi: Decode SAE AP security
+
+Decode this information for the wireless row. Note that we don't really
+need this, as it would incorrectly select WPA2 which results in the same
+icon.
+
+Based on upstream commit da0c45f2ab2b7b78695cfff9d6b7a2b045340ac7
+---
+ panels/network/net-device-wifi.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/panels/network/net-device-wifi.c b/panels/network/net-device-wifi.c
+index 33758e499..da1e4837a 100644
+--- a/panels/network/net-device-wifi.c
++++ b/panels/network/net-device-wifi.c
+@@ -46,7 +46,8 @@ typedef enum {
+   NM_AP_SEC_NONE,
+   NM_AP_SEC_WEP,
+   NM_AP_SEC_WPA,
+-  NM_AP_SEC_WPA2
++  NM_AP_SEC_WPA2,
++  NM_AP_SEC_SAE
+ } NMAccessPointSecurity;
+ 
+ static void nm_device_wifi_refresh_ui (NetDeviceWifi *device_wifi);
+@@ -146,6 +147,10 @@ get_access_point_security (NMAccessPoint *ap)
+                  wpa_flags != NM_802_11_AP_SEC_NONE &&
+                  rsn_flags != NM_802_11_AP_SEC_NONE)
+                 type = NM_AP_SEC_WPA;
++#if NM_CHECK_VERSION(1,20,6)
++        else if (rsn_flags & NM_802_11_AP_SEC_KEY_MGMT_SAE)
++                type = NM_AP_SEC_SAE;
++#endif
+         else
+                 type = NM_AP_SEC_WPA2;
+ 
+-- 
+2.34.1
+

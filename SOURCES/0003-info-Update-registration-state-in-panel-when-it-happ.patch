@@ -1,0 +1,654 @@
+From 8bd1e37f59f3b4ec617d6d0bccf7fd77a9d03ca5 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Sun, 24 Jan 2021 13:03:03 -0500
+Subject: [PATCH 3/4] info: Update registration state in panel when it happens
+ on disk
+
+The code was failing to listen for change notifications, so if the
+panel was open while the system got registered, it wouldn't update.
+
+This commit fixes that.
+---
+ panels/info/cc-info-overview-panel.c          | 33 ++++++++++++++++---
+ panels/info/cc-subscription-details-dialog.c  | 17 ++++++++--
+ panels/info/cc-subscription-details-dialog.h  |  3 +-
+ panels/info/cc-subscription-register-dialog.c | 17 ++++++++--
+ panels/info/cc-subscription-register-dialog.h |  3 +-
+ 5 files changed, 63 insertions(+), 10 deletions(-)
+
+diff --git a/panels/info/cc-info-overview-panel.c b/panels/info/cc-info-overview-panel.c
+index b2cbefb25..65246758e 100644
+--- a/panels/info/cc-info-overview-panel.c
++++ b/panels/info/cc-info-overview-panel.c
+@@ -60,60 +60,61 @@ typedef struct {
+ } GraphicsData;
+ 
+ typedef struct
+ {
+   GtkWidget      *system_image;
+   GtkWidget      *version_label;
+   GtkWidget      *name_entry;
+   GtkWidget      *memory_label;
+   GtkWidget      *processor_label;
+   GtkWidget      *os_name_label;
+   GtkWidget      *os_type_label;
+   GtkWidget      *disk_label;
+   GtkWidget      *graphics_label;
+   GtkWidget      *virt_type_label;
+   GtkWidget      *subscription_stack;
+   GtkWidget      *details_button;
+   GtkWidget      *register_button;
+   GtkWidget      *updates_separator;
+   GtkWidget      *updates_button;
+ 
+   /* Virtualisation labels */
+   GtkWidget      *label8;
+   GtkWidget      *grid1;
+   GtkWidget      *label18;
+ 
+   char           *gnome_version;
+   char           *gnome_distributor;
+   char           *gnome_date;
+ 
+   GCancellable   *cancellable;
++  GCancellable   *subscription_cancellable;
+ 
+   /* Free space */
+   GList          *primary_mounts;
+   guint64         total_bytes;
+ 
+   GraphicsData   *graphics_data;
+ 
+   GDBusProxy     *subscription_proxy;
+ } CcInfoOverviewPanelPrivate;
+ 
+ struct _CcInfoOverviewPanel
+ {
+  CcPanel parent_instance;
+ 
+   /*< private >*/
+  CcInfoOverviewPanelPrivate *priv;
+ };
+ 
+ static void get_primary_disc_info_start (CcInfoOverviewPanel *self);
+ 
+ typedef struct
+ {
+   char *major;
+   char *minor;
+   char *micro;
+   char *distributor;
+   char *date;
+   char **current;
+ } VersionData;
+ 
+@@ -821,165 +822,188 @@ reload_subscription_status (CcInfoOverviewPanel *self)
+ 
+   switch (status)
+     {
+     case GSD_SUBMAN_SUBSCRIPTION_STATUS_UNKNOWN:
+     case GSD_SUBMAN_SUBSCRIPTION_STATUS_INVALID:
+     case GSD_SUBMAN_SUBSCRIPTION_STATUS_DISABLED:
+     case GSD_SUBMAN_SUBSCRIPTION_STATUS_PARTIALLY_VALID:
+       gtk_stack_set_visible_child_name (GTK_STACK (priv->subscription_stack), "not-registered");
+       gtk_widget_set_sensitive (priv->updates_button, FALSE);
+       break;
+ 
+     case GSD_SUBMAN_SUBSCRIPTION_STATUS_VALID:
+       gtk_stack_set_visible_child_name (GTK_STACK (priv->subscription_stack), "registered");
+       gtk_widget_set_sensitive (priv->updates_button, TRUE);
+       break;
+ 
+     default:
+       g_assert_not_reached ();
+       break;
+     }
+ }
+ 
+ static void
+ on_details_button_clicked (GtkWidget           *widget,
+                            CcInfoOverviewPanel *self)
+ {
+   CcInfoOverviewPanelPrivate *priv = cc_info_overview_panel_get_instance_private (self);
+   CcSubscriptionDetailsDialog *dialog;
+   GtkWindow *toplevel;
+ 
+-  dialog = cc_subscription_details_dialog_new (priv->subscription_proxy);
++  dialog = cc_subscription_details_dialog_new (priv->subscription_proxy,
++                                               priv->subscription_cancellable);
+   toplevel = GTK_WINDOW (gtk_widget_get_toplevel (GTK_WIDGET (self)));
+   gtk_window_set_transient_for (GTK_WINDOW (dialog), toplevel);
+ 
+   gtk_dialog_run (GTK_DIALOG (dialog));
+   gtk_widget_destroy (GTK_WIDGET (dialog));
+-
+-  reload_subscription_status (self);
+ }
+ 
+ static void
+ on_register_button_clicked (GtkWidget           *widget,
+                             CcInfoOverviewPanel *self)
+ {
+   CcInfoOverviewPanelPrivate *priv = cc_info_overview_panel_get_instance_private (self);
+   CcSubscriptionRegisterDialog *dialog;
+   GtkWindow *toplevel;
+ 
+-  dialog = cc_subscription_register_dialog_new (priv->subscription_proxy);
++  dialog = cc_subscription_register_dialog_new (priv->subscription_proxy,
++                                                priv->subscription_cancellable);
+   toplevel = GTK_WINDOW (gtk_widget_get_toplevel (GTK_WIDGET (self)));
+   gtk_window_set_transient_for (GTK_WINDOW (dialog), toplevel);
+ 
+   gtk_dialog_run (GTK_DIALOG (dialog));
+   gtk_widget_destroy (GTK_WIDGET (dialog));
++}
++
++static void
++on_subscription_status_changed (GDBusProxy *proxy,
++                                GVariant *changed_properties,
++                                GStrv invalidated_properties,
++                                CcInfoOverviewPanel *self)
++{
++  CcInfoOverviewPanelPrivate *priv = cc_info_overview_panel_get_instance_private (self);
++
++  g_cancellable_cancel (priv->subscription_cancellable);
++  g_object_unref (priv->subscription_cancellable);
++
++  priv->subscription_cancellable = g_cancellable_new ();
+ 
+   reload_subscription_status (self);
+ }
+ 
+ static void
+ info_overview_panel_setup_subscriptions (CcInfoOverviewPanel *self)
+ {
+   CcInfoOverviewPanelPrivate *priv = cc_info_overview_panel_get_instance_private (self);
+   g_autoptr(GError) error = NULL;
+ 
+   priv->subscription_proxy = g_dbus_proxy_new_for_bus_sync (G_BUS_TYPE_SESSION,
+                                                             G_DBUS_PROXY_FLAGS_NONE,
+                                                             NULL,
+                                                             "org.gnome.SettingsDaemon.Subscription",
+                                                             "/org/gnome/SettingsDaemon/Subscription",
+                                                             "org.gnome.SettingsDaemon.Subscription",
+                                                             NULL, &error);
+   if (error != NULL)
+     {
+       g_debug ("Unable to create a proxy for org.gnome.SettingsDaemon.Subscription: %s",
+                error->message);
+       reload_subscription_status (self);
+       return;
+     }
+ 
++  g_signal_connect (priv->subscription_proxy, "g-properties-changed",
++                    G_CALLBACK (on_subscription_status_changed), self);
++
+   g_signal_connect (priv->details_button, "clicked", G_CALLBACK (on_details_button_clicked), self);
+   g_signal_connect (priv->register_button, "clicked", G_CALLBACK (on_register_button_clicked), self);
+ 
+   reload_subscription_status (self);
+ }
+ 
+ static gboolean
+ does_gnome_software_exist (void)
+ {
+   return g_file_test (BINDIR "/gnome-software", G_FILE_TEST_EXISTS);
+ }
+ 
+ static gboolean
+ does_gpk_update_viewer_exist (void)
+ {
+   return g_file_test (BINDIR "/gpk-update-viewer", G_FILE_TEST_EXISTS);
+ }
+ 
+ static void
+ on_updates_button_clicked (GtkWidget           *widget,
+                            CcInfoOverviewPanel *self)
+ {
+   g_autoptr(GError) error = NULL;
+   gboolean ret;
+   g_auto(GStrv) argv = NULL;
+ 
+   argv = g_new0 (gchar *, 3);
+   if (does_gnome_software_exist ())
+     {
+       argv[0] = g_build_filename (BINDIR, "gnome-software", NULL);
+       argv[1] = g_strdup_printf ("--mode=updates");
+     }
+   else
+     {
+       argv[0] = g_build_filename (BINDIR, "gpk-update-viewer", NULL);
+     }
+   ret = g_spawn_async (NULL, argv, NULL, 0, NULL, NULL, NULL, &error);
+   if (!ret)
+       g_warning ("Failed to spawn %s: %s", argv[0], error->message);
+ }
+ 
+ static void
+ cc_info_overview_panel_dispose (GObject *object)
+ {
+   CcInfoOverviewPanelPrivate *priv = cc_info_overview_panel_get_instance_private (CC_INFO_OVERVIEW_PANEL (object));
+ 
+   g_clear_pointer (&priv->graphics_data, graphics_data_free);
+ 
+   G_OBJECT_CLASS (cc_info_overview_panel_parent_class)->dispose (object);
+ }
+ 
+ static void
+ cc_info_overview_panel_finalize (GObject *object)
+ {
+   CcInfoOverviewPanelPrivate *priv = cc_info_overview_panel_get_instance_private (CC_INFO_OVERVIEW_PANEL (object));
+ 
++  if (priv->subscription_cancellable)
++    {
++      g_cancellable_cancel (priv->subscription_cancellable);
++      g_clear_object (&priv->subscription_cancellable);
++    }
++
+   if (priv->cancellable)
+     {
+       g_cancellable_cancel (priv->cancellable);
+       g_clear_object (&priv->cancellable);
+     }
+ 
+   if (priv->primary_mounts)
+     g_list_free_full (priv->primary_mounts, (GDestroyNotify) g_unix_mount_free);
+ 
+   g_free (priv->gnome_version);
+   g_free (priv->gnome_date);
+   g_free (priv->gnome_distributor);
+ 
+   g_clear_object (&priv->subscription_proxy);
+ 
+   G_OBJECT_CLASS (cc_info_overview_panel_parent_class)->finalize (object);
+ }
+ 
+ static void
+ cc_info_overview_panel_class_init (CcInfoOverviewPanelClass *klass)
+ {
+   GObjectClass *object_class = G_OBJECT_CLASS (klass);
+   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS (klass);
+ 
+   object_class->finalize = cc_info_overview_panel_finalize;
+   object_class->dispose = cc_info_overview_panel_dispose;
+ 
+   gtk_widget_class_set_template_from_resource (widget_class, "/org/gnome/control-center/info/info-overview.ui");
+ 
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, system_image);
+@@ -987,55 +1011,56 @@ cc_info_overview_panel_class_init (CcInfoOverviewPanelClass *klass)
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, name_entry);
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, memory_label);
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, processor_label);
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, os_name_label);
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, os_type_label);
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, disk_label);
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, graphics_label);
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, virt_type_label);
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, subscription_stack);
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, details_button);
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, register_button);
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, updates_separator);
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, updates_button);
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, label8);
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, grid1);
+   gtk_widget_class_bind_template_child_private (widget_class, CcInfoOverviewPanel, label18);
+ 
+   g_type_ensure (CC_TYPE_HOSTNAME_ENTRY);
+ }
+ 
+ static void
+ cc_info_overview_panel_init (CcInfoOverviewPanel *self)
+ {
+   CcInfoOverviewPanelPrivate *priv = cc_info_overview_panel_get_instance_private (self);
+ 
+   gtk_widget_init_template (GTK_WIDGET (self));
+ 
+   g_resources_register (cc_info_get_resource ());
+ 
+   priv->cancellable = g_cancellable_new ();
++  priv->subscription_cancellable = g_cancellable_new ();
+ 
+   priv->graphics_data = get_graphics_data ();
+ 
+   if (does_gnome_software_exist () || does_gpk_update_viewer_exist ())
+     g_signal_connect (priv->updates_button, "clicked", G_CALLBACK (on_updates_button_clicked), self);
+   else
+     gtk_widget_hide (priv->updates_button);
+ 
+   info_overview_panel_setup_overview (self);
+   info_overview_panel_setup_virt (self);
+   info_overview_panel_setup_subscriptions (self);
+ 
+   /* show separator when both items are visible */
+   if (gtk_widget_get_visible (priv->subscription_stack) && gtk_widget_get_visible (priv->updates_button))
+     gtk_widget_show (priv->updates_separator);
+   else
+     gtk_widget_hide (priv->updates_separator);
+ }
+ 
+ GtkWidget *
+ cc_info_overview_panel_new (void)
+ {
+   return g_object_new (CC_TYPE_INFO_OVERVIEW_PANEL,
+                        NULL);
+ }
+diff --git a/panels/info/cc-subscription-details-dialog.c b/panels/info/cc-subscription-details-dialog.c
+index 1931ced81..3d77e6c48 100644
+--- a/panels/info/cc-subscription-details-dialog.c
++++ b/panels/info/cc-subscription-details-dialog.c
+@@ -311,97 +311,110 @@ header_unregister_button_clicked_cb (CcSubscriptionDetailsDialog *self)
+                      self);
+ }
+ 
+ static void
+ back_button_clicked_cb (CcSubscriptionDetailsDialog *self)
+ {
+   gtk_spinner_stop (self->spinner);
+ 
+   self->state = DIALOG_STATE_SHOW_DETAILS;
+   dialog_reload (self);
+ }
+ 
+ static void
+ unregister_button_clicked_cb (CcSubscriptionDetailsDialog *self)
+ {
+   self->state = DIALOG_STATE_UNREGISTER;
+   dialog_reload (self);
+ }
+ 
+ static void
+ dismiss_notification (CcSubscriptionDetailsDialog *self)
+ {
+   gtk_revealer_set_reveal_child (self->notification_revealer, FALSE);
+ }
+ 
+ static void
+ cc_subscription_details_dialog_init (CcSubscriptionDetailsDialog *self)
+ {
+   gtk_widget_init_template (GTK_WIDGET (self));
+ 
+-  self->cancellable = g_cancellable_new ();
+   self->products = g_ptr_array_new_with_free_func ((GDestroyNotify) product_data_free);
+   self->state = DIALOG_STATE_SHOW_DETAILS;
+ }
+ 
+ static void
+ cc_subscription_details_dialog_dispose (GObject *obj)
+ {
+   CcSubscriptionDetailsDialog *self = (CcSubscriptionDetailsDialog *) obj;
+ 
+   g_cancellable_cancel (self->cancellable);
+   g_clear_object (&self->cancellable);
+   g_clear_object (&self->subscription_proxy);
+ 
+   G_OBJECT_CLASS (cc_subscription_details_dialog_parent_class)->dispose (obj);
+ }
+ 
+ static void
+ cc_subscription_details_dialog_finalize (GObject *obj)
+ {
+   CcSubscriptionDetailsDialog *self = (CcSubscriptionDetailsDialog *) obj;
+ 
+   g_clear_pointer (&self->products, g_ptr_array_unref);
+ 
+   G_OBJECT_CLASS (cc_subscription_details_dialog_parent_class)->finalize (obj);
+ }
+ 
+ static void
+ cc_subscription_details_dialog_class_init (CcSubscriptionDetailsDialogClass *klass)
+ {
+   GObjectClass *object_class = G_OBJECT_CLASS (klass);
+   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS (klass);
+ 
+   object_class->dispose = cc_subscription_details_dialog_dispose;
+   object_class->finalize = cc_subscription_details_dialog_finalize;
+ 
+   gtk_widget_class_set_template_from_resource (widget_class, "/org/gnome/control-center/info/cc-subscription-details-dialog.ui");
+ 
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionDetailsDialog, back_button);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionDetailsDialog, spinner);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionDetailsDialog, header_unregister_button);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionDetailsDialog, notification_revealer);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionDetailsDialog, error_label);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionDetailsDialog, stack);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionDetailsDialog, products_box1);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionDetailsDialog, products_box2);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionDetailsDialog, unregister_button);
+ 
+   gtk_widget_class_bind_template_callback (widget_class, back_button_clicked_cb);
+   gtk_widget_class_bind_template_callback (widget_class, header_unregister_button_clicked_cb);
+   gtk_widget_class_bind_template_callback (widget_class, unregister_button_clicked_cb);
+   gtk_widget_class_bind_template_callback (widget_class, dismiss_notification);
+ }
+ 
++static void
++on_dialog_cancelled (CcSubscriptionDetailsDialog *self)
++{
++  gtk_dialog_response (GTK_DIALOG (self), GTK_RESPONSE_CLOSE);
++}
++
+ CcSubscriptionDetailsDialog *
+-cc_subscription_details_dialog_new (GDBusProxy *subscription_proxy)
++cc_subscription_details_dialog_new (GDBusProxy *subscription_proxy,
++                                    GCancellable *cancellable)
+ {
+   CcSubscriptionDetailsDialog *self;
+ 
+   self = g_object_new (CC_TYPE_SUBSCRIPTION_DETAILS_DIALOG, "use-header-bar", TRUE, NULL);
+   self->subscription_proxy = g_object_ref (subscription_proxy);
++  self->cancellable = g_object_ref (cancellable);
++
++  g_signal_connect_object (G_OBJECT (self->cancellable),
++                           "cancelled",
++                           G_CALLBACK (on_dialog_cancelled),
++                           self,
++                           G_CONNECT_SWAPPED);
+ 
+   load_installed_products (self);
+   dialog_reload (self);
+ 
+   return self;
+ }
+diff --git a/panels/info/cc-subscription-details-dialog.h b/panels/info/cc-subscription-details-dialog.h
+index a61a22838..f14dd157b 100644
+--- a/panels/info/cc-subscription-details-dialog.h
++++ b/panels/info/cc-subscription-details-dialog.h
+@@ -1,32 +1,33 @@
+ /* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*-
+  *
+  * Copyright 2019  Red Hat, Inc,
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  *
+  * This program is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, see <http://www.gnu.org/licenses/>.
+  *
+  * Written by: Kalev Lember <klember@redhat.com>
+  */
+ 
+ #pragma once
+ 
+ #include <gtk/gtk.h>
+ 
+ G_BEGIN_DECLS
+ 
+ #define CC_TYPE_SUBSCRIPTION_DETAILS_DIALOG (cc_subscription_details_dialog_get_type ())
+ G_DECLARE_FINAL_TYPE (CcSubscriptionDetailsDialog, cc_subscription_details_dialog, CC, SUBSCRIPTION_DETAILS_DIALOG, GtkDialog)
+ 
+-CcSubscriptionDetailsDialog *cc_subscription_details_dialog_new (GDBusProxy *subscription_proxy);
++CcSubscriptionDetailsDialog *cc_subscription_details_dialog_new (GDBusProxy   *subscription_proxy,
++                                                                 GCancellable *cancellable);
+ 
+ G_END_DECLS
+diff --git a/panels/info/cc-subscription-register-dialog.c b/panels/info/cc-subscription-register-dialog.c
+index d7a17cc99..e8c2f581c 100644
+--- a/panels/info/cc-subscription-register-dialog.c
++++ b/panels/info/cc-subscription-register-dialog.c
+@@ -299,61 +299,60 @@ subscription_register_with_username (CcSubscriptionRegisterDialog *self)
+                      self->cancellable,
+                      registration_done_cb,
+                      self);
+ }
+ 
+ static void
+ register_button_clicked_cb (CcSubscriptionRegisterDialog *self)
+ {
+   if (gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (self->register_with_activation_keys_radio)))
+     subscription_register_with_activation_keys (self);
+   else
+     subscription_register_with_username (self);
+ 
+   gtk_spinner_start (self->spinner);
+ 
+   self->state = DIALOG_STATE_REGISTERING;
+   dialog_reload (self);
+ }
+ 
+ static void
+ dismiss_notification (CcSubscriptionRegisterDialog *self)
+ {
+   gtk_revealer_set_reveal_child (self->notification_revealer, FALSE);
+ }
+ 
+ static void
+ cc_subscription_register_dialog_init (CcSubscriptionRegisterDialog *self)
+ {
+   gtk_widget_init_template (GTK_WIDGET (self));
+ 
+-  self->cancellable = g_cancellable_new ();
+   self->state = DIALOG_STATE_REGISTER;
+ 
+   gtk_entry_set_text (self->url_entry, SERVER_URL);
+   gtk_widget_grab_focus (GTK_WIDGET (self->login_entry));
+   dialog_validate (self);
+   dialog_reload (self);
+ }
+ 
+ static void
+ cc_subscription_register_dialog_dispose (GObject *obj)
+ {
+   CcSubscriptionRegisterDialog *self = (CcSubscriptionRegisterDialog *) obj;
+ 
+   g_cancellable_cancel (self->cancellable);
+   g_clear_object (&self->cancellable);
+   g_clear_object (&self->subscription_proxy);
+ 
+   G_OBJECT_CLASS (cc_subscription_register_dialog_parent_class)->dispose (obj);
+ }
+ 
+ static void
+ cc_subscription_register_dialog_finalize (GObject *obj)
+ {
+   G_OBJECT_CLASS (cc_subscription_register_dialog_parent_class)->finalize (obj);
+ }
+ 
+ static void
+ cc_subscription_register_dialog_class_init (CcSubscriptionRegisterDialogClass *klass)
+ {
+   GObjectClass *object_class = G_OBJECT_CLASS (klass);
+@@ -364,40 +363,54 @@ cc_subscription_register_dialog_class_init (CcSubscriptionRegisterDialogClass *k
+ 
+   gtk_widget_class_set_template_from_resource (widget_class, "/org/gnome/control-center/info/cc-subscription-register-dialog.ui");
+ 
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, spinner);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, register_button);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, notification_revealer);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, error_label);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, default_url_radio);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, custom_url_radio);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, register_radio);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, register_with_activation_keys_radio);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, stack);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, register_grid);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, register_with_activation_keys_grid);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, url_label);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, url_entry);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, login_entry);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, password_entry);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, activation_keys_entry);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, organization_label);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, organization_entry);
+   gtk_widget_class_bind_template_child (widget_class, CcSubscriptionRegisterDialog, organization_entry_with_activation_keys);
+ 
+   gtk_widget_class_bind_template_callback (widget_class, dialog_validate);
+   gtk_widget_class_bind_template_callback (widget_class, register_button_clicked_cb);
+   gtk_widget_class_bind_template_callback (widget_class, dismiss_notification);
+   gtk_widget_class_bind_template_callback (widget_class, custom_url_radio_toggled_cb);
+   gtk_widget_class_bind_template_callback (widget_class, register_with_activation_keys_radio_toggled_cb);
+ }
+ 
++static void
++on_dialog_cancelled (CcSubscriptionRegisterDialog *self)
++{
++  gtk_dialog_response (GTK_DIALOG (self), GTK_RESPONSE_CLOSE);
++}
++
+ CcSubscriptionRegisterDialog *
+-cc_subscription_register_dialog_new (GDBusProxy *subscription_proxy)
++cc_subscription_register_dialog_new (GDBusProxy *subscription_proxy,
++                                     GCancellable *cancellable)
+ {
+   CcSubscriptionRegisterDialog *self;
+ 
+   self = g_object_new (CC_TYPE_SUBSCRIPTION_REGISTER_DIALOG, "use-header-bar", TRUE, NULL);
+   self->subscription_proxy = g_object_ref (subscription_proxy);
++  self->cancellable = g_object_ref (cancellable);
++
++  g_signal_connect_object (G_OBJECT (self->cancellable),
++                           "cancelled",
++                           G_CALLBACK (on_dialog_cancelled),
++                           self,
++                           G_CONNECT_SWAPPED);
+ 
+   return self;
+ }
+diff --git a/panels/info/cc-subscription-register-dialog.h b/panels/info/cc-subscription-register-dialog.h
+index c5918df9f..31c254084 100644
+--- a/panels/info/cc-subscription-register-dialog.h
++++ b/panels/info/cc-subscription-register-dialog.h
+@@ -1,32 +1,33 @@
+ /* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*-
+  *
+  * Copyright 2019  Red Hat, Inc,
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  *
+  * This program is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, see <http://www.gnu.org/licenses/>.
+  *
+  * Written by: Kalev Lember <klember@redhat.com>
+  */
+ 
+ #pragma once
+ 
+ #include <gtk/gtk.h>
+ 
+ G_BEGIN_DECLS
+ 
+ #define CC_TYPE_SUBSCRIPTION_REGISTER_DIALOG (cc_subscription_register_dialog_get_type ())
+ G_DECLARE_FINAL_TYPE (CcSubscriptionRegisterDialog, cc_subscription_register_dialog, CC, SUBSCRIPTION_REGISTER_DIALOG, GtkDialog)
+ 
+-CcSubscriptionRegisterDialog *cc_subscription_register_dialog_new (GDBusProxy *subscription_proxy);
++CcSubscriptionRegisterDialog *cc_subscription_register_dialog_new (GDBusProxy *subscription_proxy,
++                                                                   GCancellable *cancellable);
+ 
+ G_END_DECLS
+-- 
+2.28.0
+

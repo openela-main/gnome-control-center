@@ -1,0 +1,708 @@
+From c96f608b5d6c3ac12cb8bf76e4688f6c0e8dd059 Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Tue, 23 Apr 2019 19:29:41 +0200
+Subject: [PATCH 1/3] network: Rename section header
+
+The "Bluetooth" section is actually a catchall section for all
+device types we don't know much specifically (Includes, but not
+limited to Bluetooth).
+
+Rename/relabel it to something more comprehensive.
+
+Closes https://gitlab.gnome.org/GNOME/gnome-control-center/issues/488
+---
+ panels/network/network.ui | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/panels/network/network.ui b/panels/network/network.ui
+index 14c70cd..189febf 100644
+--- a/panels/network/network.ui
++++ b/panels/network/network.ui
+@@ -87,7 +87,7 @@
+                             <property name="orientation">vertical</property>
+                             <property name="spacing">12</property>
+ 
+-                            <!-- Bluetooth header -->
++                            <!-- "Other Devices" header -->
+                             <child>
+                               <object class="GtkBox">
+                                 <property name="visible">True</property>
+@@ -98,7 +98,7 @@
+                                     <property name="can_focus">False</property>
+                                     <property name="hexpand">True</property>
+                                     <property name="xalign">0.0</property>
+-                                    <property name="label" translatable="yes">Bluetooth</property>
++                                    <property name="label" translatable="yes">Other Devices</property>
+                                     <attributes>
+                                       <attribute name="weight" value="bold" />
+                                     </attributes>
+-- 
+2.27.0.rc2
+
+
+From fc48e7e618a92f9d52cd61a9ef9b14bf889a9ef3 Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Tue, 23 Apr 2019 19:46:32 +0200
+Subject: [PATCH 2/3] network: Handle Infiniband as a wired interface
+
+The configuration/UI we expose for wired settings are meaningful for those
+devices as well.
+
+Closes: https://gitlab.gnome.org/GNOME/gnome-control-center/issues/489
+---
+ panels/network/cc-network-panel.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/panels/network/cc-network-panel.c b/panels/network/cc-network-panel.c
+index 51ea823..5cdf616 100644
+--- a/panels/network/cc-network-panel.c
++++ b/panels/network/cc-network-panel.c
+@@ -461,6 +461,7 @@ panel_add_device (CcNetworkPanel *panel, NMDevice *device)
+         /* map the NMDeviceType to the GType, or ignore */
+         switch (type) {
+         case NM_DEVICE_TYPE_ETHERNET:
++        case NM_DEVICE_TYPE_INFINIBAND:
+                 device_g_type = NET_TYPE_DEVICE_ETHERNET;
+                 break;
+         case NM_DEVICE_TYPE_MODEM:
+-- 
+2.27.0.rc2
+
+
+From f71f867f35a8a6c437d2d525e39f3846e0782e4b Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Thu, 11 Jun 2020 14:16:03 +0200
+Subject: [PATCH 3/3] Update translations
+
+---
+ po/ca.po    | 4 ++++
+ po/cs.po    | 4 ++++
+ po/da.po    | 4 ++++
+ po/de.po    | 4 ++++
+ po/el.po    | 4 ++++
+ po/en_GB.po | 4 ++++
+ po/eo.po    | 4 ++++
+ po/es.po    | 4 ++++
+ po/eu.po    | 4 ++++
+ po/fa.po    | 4 ++++
+ po/fi.po    | 4 ++++
+ po/fr.po    | 4 ++++
+ po/fur.po   | 4 ++++
+ po/gl.po    | 4 ++++
+ po/hr.po    | 4 ++++
+ po/hu.po    | 4 ++++
+ po/id.po    | 4 ++++
+ po/it.po    | 4 ++++
+ po/ja.po    | 4 ++++
+ po/ko.po    | 4 ++++
+ po/lt.po    | 4 ++++
+ po/ms.po    | 4 ++++
+ po/nb.po    | 4 ++++
+ po/ne.po    | 4 ++++
+ po/nl.po    | 4 ++++
+ po/oc.po    | 5 +++++
+ po/pa.po    | 4 ++++
+ po/pl.po    | 4 ++++
+ po/pt_BR.po | 4 ++++
+ po/ro.po    | 4 ++++
+ po/ru.po    | 4 ++++
+ po/sk.po    | 4 ++++
+ po/sl.po    | 4 ++++
+ po/sr.po    | 4 ++++
+ po/sv.po    | 4 ++++
+ po/tr.po    | 4 ++++
+ po/uk.po    | 5 +++++
+ po/zh_CN.po | 4 ++++
+ po/zh_TW.po | 4 ++++
+ 39 files changed, 158 insertions(+)
+
+diff --git a/po/ca.po b/po/ca.po
+index 0592282..36172d9 100644
+--- a/po/ca.po
++++ b/po/ca.po
+@@ -224,6 +224,10 @@ msgstr "Desactiveu el mode d'avió per a habilitar el Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Altres dispositius"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Activeu i desactiveu el Bluetooth i connecteu els dispositius"
+diff --git a/po/cs.po b/po/cs.po
+index 7d6c2cc..b827d87 100644
+--- a/po/cs.po
++++ b/po/cs.po
+@@ -226,6 +226,10 @@ msgstr "Vypněte přepínač režimu „letadlo“, aby se povolilo Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Ostatní zařízení"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Zapnout a vypnout Bluetooth a připojit se k zařízením"
+diff --git a/po/da.po b/po/da.po
+index dc85493..bfcd034 100644
+--- a/po/da.po
++++ b/po/da.po
+@@ -234,6 +234,10 @@ msgstr "Sluk for kontakten Flytilstand for at aktivere Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Andre enheder"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Slå Bluetooth til eller fra og tilslut dine enheder"
+diff --git a/po/de.po b/po/de.po
+index 78325a2..a5d65f8 100644
+--- a/po/de.po
++++ b/po/de.po
+@@ -230,6 +230,10 @@ msgstr ""
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Weitere Geräte"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Schalten Sie Bluetooth an oder aus und verbinden Sie Ihre Geräte"
+diff --git a/po/el.po b/po/el.po
+index a4a1374..81120c7 100644
+--- a/po/el.po
++++ b/po/el.po
+@@ -2934,6 +2934,10 @@ msgstr "Απενεργοποίηση συσκευής"
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Άλλες συσκευές"
++
+ #: ../panels/network/network.ui.h:3
+ msgid "Not set up"
+ msgstr "Δεν είναι ρυθμισμένο"
+diff --git a/po/en_GB.po b/po/en_GB.po
+index 96733a1..1bba5a6 100644
+--- a/po/en_GB.po
++++ b/po/en_GB.po
+@@ -213,6 +213,10 @@ msgstr "Turn off the Aeroplane mode switch to enable Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Other Devices"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Turn Bluetooth on and off and connect your devices"
+diff --git a/po/eo.po b/po/eo.po
+index a13393b..473ed08 100644
+--- a/po/eo.po
++++ b/po/eo.po
+@@ -3000,6 +3000,10 @@ msgstr "Elŝalti aparaton"
+ msgid "Bluetooth"
+ msgstr "Bludento"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Aliaj aparatoj"
++
+ #: ../panels/network/network.ui.h:3
+ msgid "Not set up"
+ msgstr ""
+diff --git a/po/es.po b/po/es.po
+index b59dcd8..4ae235b 100644
+--- a/po/es.po
++++ b/po/es.po
+@@ -221,6 +221,10 @@ msgstr "Apague el modo avión para activar el Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Otros dispositivos"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Activar y desactivar Bluetooth y conectar sus dispositivos"
+diff --git a/po/eu.po b/po/eu.po
+index b702316..8ed6d30 100644
+--- a/po/eu.po
++++ b/po/eu.po
+@@ -2906,6 +2906,10 @@ msgstr "Desaktibatu gailua"
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Beste gailuak"
++
+ #: ../panels/network/network.ui.h:3
+ msgid "Not set up"
+ msgstr "Konfiguratu gabe"
+diff --git a/po/fa.po b/po/fa.po
+index 12a92ac..101b73c 100644
+--- a/po/fa.po
++++ b/po/fa.po
+@@ -2792,6 +2792,10 @@ msgstr "خاموش کردن دستگاه"
+ msgid "Bluetooth"
+ msgstr "بلوتوث"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "دیگر دستگاه‌ها"
++
+ #: ../panels/network/network.ui.h:3
+ msgid "Not set up"
+ msgstr "برپا نشده"
+diff --git a/po/fi.po b/po/fi.po
+index 30f8098..b278e0f 100644
+--- a/po/fi.po
++++ b/po/fi.po
+@@ -228,6 +228,10 @@ msgstr "Poista lentokonetila käytöstä käyttääksesi Bluetoothia."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Muut laitteet"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Kytke Bluetooth päälle tai pois ja yhdistä laitteita"
+diff --git a/po/fr.po b/po/fr.po
+index fbe309a..7c55fd2 100644
+--- a/po/fr.po
++++ b/po/fr.po
+@@ -241,6 +241,10 @@ msgstr "Désactivez le mode avion pour activer le Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Autres périphériques"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Active/désactive le Bluetooth et connecte vos périphériques"
+diff --git a/po/fur.po b/po/fur.po
+index 7cc4bb2..7bdfcba 100644
+--- a/po/fur.po
++++ b/po/fur.po
+@@ -211,6 +211,10 @@ msgstr "Distude il cric de modalitât Avion par abilitâ il Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Altris dispositîfs"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Impie e distude il Bluetooth e conet i tiei dispositîfs"
+diff --git a/po/gl.po b/po/gl.po
+index 6a2061f..b4763b7 100644
+--- a/po/gl.po
++++ b/po/gl.po
+@@ -222,6 +222,10 @@ msgstr "Apague o modo avión para activar o Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Outros dispositivos"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Active ou desactive o Bluetooth e conecte os seus dispositivos"
+diff --git a/po/hr.po b/po/hr.po
+index 480fe50..740ef7b 100644
+--- a/po/hr.po
++++ b/po/hr.po
+@@ -209,6 +209,10 @@ msgstr "Isključite način rada u zrakoplovu kako bi mogli kristiti Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Ostali uređaji"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Uključite ili isključite Bluetooth i povežite svoje uređaje"
+diff --git a/po/hu.po b/po/hu.po
+index 9fddf1c..41b0e51 100644
+--- a/po/hu.po
++++ b/po/hu.po
+@@ -220,6 +220,10 @@ msgstr ""
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Egyéb eszközök"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Kapcsolja be és ki a Bluetooth-t, majd csatlakoztassa eszközeit"
+diff --git a/po/id.po b/po/id.po
+index ad2772a..49c370d 100644
+--- a/po/id.po
++++ b/po/id.po
+@@ -213,6 +213,10 @@ msgstr "Matikan saklar mode Pesawat Terbang untuk memfungsikan Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Perangkat Lainnya"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Nyalakan dan matikan Bluetooth dan sambungkan perangkat Anda"
+diff --git a/po/it.po b/po/it.po
+index cdbc7b0..1390c7c 100644
+--- a/po/it.po
++++ b/po/it.po
+@@ -216,6 +216,10 @@ msgstr "Disattivare la modalità aereo via hardware per abilitare il Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Altri dispositivi"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Attiva e disattiva il Bluetooth e connette i propri dispositivi"
+diff --git a/po/ja.po b/po/ja.po
+index 5f4767f..bc144dd 100644
+--- a/po/ja.po
++++ b/po/ja.po
+@@ -2893,6 +2893,10 @@ msgstr "デバイスをオフにする"
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "その他のデバイス"
++
+ #: ../panels/network/network.ui.h:3
+ msgid "Not set up"
+ msgstr "未設定"
+diff --git a/po/ko.po b/po/ko.po
+index 49d9c2f..3d350b2 100644
+--- a/po/ko.po
++++ b/po/ko.po
+@@ -230,6 +230,10 @@ msgstr "블루투스를 사용하려면 비행 모드 스위치를 끄십시오.
+ msgid "Bluetooth"
+ msgstr "블루투스"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "기타 장치"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "블루투스를 켜거나 끄고 블루투스 장치에 연결합니다"
+diff --git a/po/lt.po b/po/lt.po
+index 3a1292e..9328564 100644
+--- a/po/lt.po
++++ b/po/lt.po
+@@ -220,6 +220,10 @@ msgstr "Išjunkite skrydžio veiksenos jungiklį Bluetooth įjungimui."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Kiti įrenginiai"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Įjunkite arba išjunkite Bluetooth ir junkitės prie savo įrenginių"
+diff --git a/po/ms.po b/po/ms.po
+index c78df1b..e90eec8 100644
+--- a/po/ms.po
++++ b/po/ms.po
+@@ -2723,6 +2723,10 @@ msgstr "Profail ujian:"
+ msgid "VPN"
+ msgstr ""
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Lain-lain Peranti"
++
+ #: ../panels/network/connection-editor/net-connection-editor.c:578
+ msgid "Bond"
+ msgstr ""
+diff --git a/po/nb.po b/po/nb.po
+index e1e4b11..02815b2 100644
+--- a/po/nb.po
++++ b/po/nb.po
+@@ -2842,6 +2842,10 @@ msgstr "Slå enhet av"
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Andre enheter"
++
+ #: ../panels/network/network.ui.h:3
+ msgid "Not set up"
+ msgstr "Ikke satt opp"
+diff --git a/po/ne.po b/po/ne.po
+index 6cd1bb9..ad3a137 100644
+--- a/po/ne.po
++++ b/po/ne.po
+@@ -2448,6 +2448,10 @@ msgstr "नायाँ प्रोफाइल"
+ msgid "VPN"
+ msgstr "भीपीएन"
+ 
++#: panels/network/network.ui:102
++msgid "Other Devices"
++msgstr "अरु यन्त्रहरू "
++
+ #: ../panels/network/connection-editor/net-connection-editor.c:751
+ msgid "Import from file…"
+ msgstr "फाईलबाट आयात गर्नुहोस्"
+diff --git a/po/nl.po b/po/nl.po
+index 3b48a77..d81a865 100644
+--- a/po/nl.po
++++ b/po/nl.po
+@@ -233,6 +233,10 @@ msgstr "Vliegtuigstand uitschakelen om Bluetooth mogelijk te maken."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Overige apparaten"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Bluetooth aan- en uitzetten en uw apparaten aansluiten"
+diff --git a/po/oc.po b/po/oc.po
+index bcd7fbe..025b78b 100644
+--- a/po/oc.po
++++ b/po/oc.po
+@@ -2815,6 +2815,11 @@ msgstr "Apondre lo periferic"
+ msgid "Remove Device"
+ msgstr "Levar lo periferic"
+ 
++#: panels/network/network.ui:102
++#| msgid "Devices"
++msgid "Other Devices"
++msgstr "Autres periferics"
++
+ #: ../panels/network/network-vpn.ui.h:1
+ msgid "VPN Type"
+ msgstr "Tipe de VPN"
+diff --git a/po/pa.po b/po/pa.po
+index ce50b62..a894921 100644
+--- a/po/pa.po
++++ b/po/pa.po
+@@ -215,6 +215,10 @@ msgstr "ਬਲੂਟੁੱਥ ਨੂੰ ਸਮਰੱਥ ਕਰਨ ਲਈ ਏਅ
+ msgid "Bluetooth"
+ msgstr "ਬਲੂਟੁੱਥ"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "ਹੋਰ ਡਿਵਾਈਸ"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "ਬਲੂਟੁੱਥ ਜੰਤਰ ਨੂੰ ਚਾਲੂ ਤੇ ਬੰਦ ਕਰੋ ਅਤੇ ਆਪਣੇ ਜੰਤਰਾਂ ਨਾਲ ਕਨੈਕਟ ਕਰੋ-"
+diff --git a/po/pl.po b/po/pl.po
+index 9093e4e..c1536f4 100644
+--- a/po/pl.po
++++ b/po/pl.po
+@@ -214,6 +214,10 @@ msgstr "Należy wyłączyć przełącznik trybu sprzętowego, aby włączyć Blu
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Inne urządzenia"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Włączanie Bluetooth i łączenie z urządzeniami"
+diff --git a/po/pt_BR.po b/po/pt_BR.po
+index acad283..bc0861b 100644
+--- a/po/pt_BR.po
++++ b/po/pt_BR.po
+@@ -236,6 +236,10 @@ msgstr "Desligue o alternador do modo avião para habilitar o Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Outros dispositivos"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Ligue e desligue o Bluetooth e conecte seus dispositivos"
+diff --git a/po/ro.po b/po/ro.po
+index 10fc7eb..6d3f307 100644
+--- a/po/ro.po
++++ b/po/ro.po
+@@ -221,6 +221,10 @@ msgstr "Opriți modul avion pentru a putea activa Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:102
++msgid "Other Devices"
++msgstr "Alte dispozitive"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Deschideți și închideți Bluetooth și conectați-vă dispozitivele"
+diff --git a/po/ru.po b/po/ru.po
+index 52762fd..414b598 100644
+--- a/po/ru.po
++++ b/po/ru.po
+@@ -226,6 +226,10 @@ msgstr "Для включения Bluetooth выключите режим для
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Другие устройства"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Включение и отключение Bluetooth. Подключение устройств Bluetooth"
+diff --git a/po/sk.po b/po/sk.po
+index 3d67fb2..1a4ee5e 100644
+--- a/po/sk.po
++++ b/po/sk.po
+@@ -231,6 +231,10 @@ msgstr "Vypnite prepínač režimu v lietadle na povolenie rozhrania Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Ostatné zariadenia"
++
+ # desktop entry comment
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+diff --git a/po/sl.po b/po/sl.po
+index ba5f934..5008f64 100644
+--- a/po/sl.po
++++ b/po/sl.po
+@@ -215,6 +215,10 @@ msgstr "Izklopi letalski način za omogočanje vmesnika Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Druge naprave"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Vklopite in izklopite Bluetooth in povežite svoje naprave"
+diff --git a/po/sr.po b/po/sr.po
+index 1c747a4..6604629 100644
+--- a/po/sr.po
++++ b/po/sr.po
+@@ -218,6 +218,10 @@ msgstr "Искључите авионски режим рада бисте ук
+ msgid "Bluetooth"
+ msgstr "Блутут"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Други уређаји"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Укључите или искључите блутут и повежите ваше уређаје"
+diff --git a/po/sv.po b/po/sv.po
+index d8f4138..25567fb 100644
+--- a/po/sv.po
++++ b/po/sv.po
+@@ -217,6 +217,10 @@ msgstr "Slå av växelknappen för flygplansläge för att aktivera Bluetooth."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Andra enheter"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Slå på samt av Bluetooth och anslut dina enheter"
+diff --git a/po/tr.po b/po/tr.po
+index 7ac1573..5ef1d82 100644
+--- a/po/tr.po
++++ b/po/tr.po
+@@ -220,6 +220,10 @@ msgstr "Bluetooth’u etkinleştirmek için Uçak kipini kapat."
+ msgid "Bluetooth"
+ msgstr "Bluetooth"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "Diğer Aygıtlar"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "Bluetooth’u açıp kapatın ve aygıtlarınızı bağlayın"
+diff --git a/po/uk.po b/po/uk.po
+index 9e9d8dc..4bc1cbb 100644
+--- a/po/uk.po
++++ b/po/uk.po
+@@ -2900,6 +2900,11 @@ msgstr "Додати пристрій"
+ msgid "Remove Device"
+ msgstr "Вилучити носій"
+ 
++#: panels/network/network.ui:68
++#| msgid "Devices"
++msgid "Other Devices"
++msgstr "Інші пристрої"
++
+ #: ../panels/network/network-vpn.ui.h:1
+ msgid "VPN Type"
+ msgstr "Тип VPN"
+diff --git a/po/zh_CN.po b/po/zh_CN.po
+index 3c7050c..c3153b1 100644
+--- a/po/zh_CN.po
++++ b/po/zh_CN.po
+@@ -2780,6 +2780,10 @@ msgstr "添加设备"
+ msgid "Remove Device"
+ msgstr "移除设备"
+ 
++#: panels/network/network.ui:102
++msgid "Other Devices"
++msgstr "其他设备"
++
+ #: ../panels/network/network-vpn.ui.h:1
+ msgid "VPN Type"
+ msgstr "VPN 类型"
+diff --git a/po/zh_TW.po b/po/zh_TW.po
+index 8d5a5a0..e0de674 100644
+--- a/po/zh_TW.po
++++ b/po/zh_TW.po
+@@ -215,6 +215,10 @@ msgstr "關閉飛安模式開關以啟用藍牙。"
+ msgid "Bluetooth"
+ msgstr "藍牙"
+ 
++#: panels/network/network.ui:68
++msgid "Other Devices"
++msgstr "其他裝置"
++
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:4
+ msgid "Turn Bluetooth on and off and connect your devices"
+ msgstr "開啟或關閉藍牙與連接您的裝置"
+-- 
+2.27.0.rc2
+

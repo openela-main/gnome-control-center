@@ -1,0 +1,599 @@
+From ecc4b3d0f021012a5f46bb7852bb85cc314468b9 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Wed, 3 Aug 2022 10:49:05 +0200
+Subject: [PATCH] network: Split airplane-mode widget off main Wi-Fi panel
+ stack
+
+The airplane-mode widget (rfkill_widget) on the wifi panel was part
+of the "wifi-connections" stack page, and it would get hidden
+whenever the panel switched to another page ("nm-not-running" or
+"no-wifi-devices").
+
+This way, whenever a user would turn airplane-mode ON, the panel
+would disable wifi and set the main stack page to "no-wifi-devices",
+making the airplane-mode widget inaccessible, preventing users from
+turning airplane-mode OFF in gnome-control-center.
+
+These changes reorganize the widget hierarchy as such that the
+airplane-mode widget is now above the main stack and will persist
+visible as the main stack changes.
+---
+ panels/network/cc-wifi-panel.c |  17 ++
+ panels/network/wifi.ui         | 464 +++++++++++++++++----------------
+ 2 files changed, 255 insertions(+), 226 deletions(-)
+
+diff --git a/panels/network/cc-wifi-panel.c b/panels/network/cc-wifi-panel.c
+index 2c1cd17b7..989506c6a 100644
+--- a/panels/network/cc-wifi-panel.c
++++ b/panels/network/cc-wifi-panel.c
+@@ -411,6 +411,17 @@ wireless_enabled_cb (NMClient    *client,
+   check_main_stack_page (self);
+ }
+ 
++static void
++on_rfkill_proxy_properties_changed_cb (GDBusProxy  *proxy,
++                                       GVariant    *changed_properties,
++                                       GStrv        invalidated_properties,
++                                       CcWifiPanel *self)
++{
++  g_debug ("Rfkill properties changed");
++
++  sync_airplane_mode_switch (self);
++}
++
+ static void
+ rfkill_proxy_acquired_cb (GObject      *source_object,
+                           GAsyncResult *res,
+@@ -436,6 +447,12 @@ rfkill_proxy_acquired_cb (GObject      *source_object,
+ 
+   self->rfkill_proxy = proxy;
+ 
++  g_signal_connect_object (proxy,
++                           "g-properties-changed",
++                           G_CALLBACK (on_rfkill_proxy_properties_changed_cb),
++                           self,
++                           0);
++
+   sync_airplane_mode_switch (self);
+ }
+ 
+diff --git a/panels/network/wifi.ui b/panels/network/wifi.ui
+index a3eab3889..c0f8a06b1 100644
+--- a/panels/network/wifi.ui
++++ b/panels/network/wifi.ui
+@@ -4,294 +4,306 @@
+   <template class="CcWifiPanel" parent="CcPanel">
+     <property name="visible">True</property>
+     <property name="can-focus">False</property>
++
+     <child>
+-      <object class="GtkStack" id="main_stack">
++      <object class="GtkScrolledWindow">
+         <property name="visible">True</property>
+         <property name="can-focus">False</property>
+-        <property name="homogeneous">False</property>
+-        <property name="transition_type">crossfade</property>
+-
+-        <!-- "No Wi-Fi Adapter" page -->
++        <property name="hscrollbar-policy">never</property>
+         <child>
+-          <object class="GtkBox">
++          <object class="GtkViewport">
+             <property name="visible">True</property>
+-            <property name="can_focus">False</property>
+-            <property name="expand">True</property>
+-            <property name="halign">center</property>
+-            <property name="valign">center</property>
+-            <property name="orientation">vertical</property>
+-            <child>
+-              <object class="GtkImage">
+-                <property name="visible">True</property>
+-                <property name="can_focus">False</property>
+-                <property name="icon_name">network-wireless-no-route-symbolic</property>
+-                <property name="pixel_size">256</property>
+-                <property name="margin-bottom">18</property>
+-                <style>
+-                  <class name="dim-label" />
+-                </style>
+-              </object>
+-            </child>
+-            <child>
+-              <object class="GtkLabel">
+-                <property name="visible">True</property>
+-                <property name="can_focus">False</property>
+-                <property name="wrap">True</property>
+-                <property name="label" translatable="yes">No Wi-Fi Adapter Found</property>
+-                <attributes>
+-                  <attribute name="weight" value="bold" />
+-                  <attribute name="scale" value="1.2" />
+-                </attributes>
+-              </object>
+-            </child>
+-            <child>
+-              <object class="GtkLabel">
+-                <property name="visible">True</property>
+-                <property name="can_focus">False</property>
+-                <property name="wrap">True</property>
+-                <property name="label" translatable="yes">Make sure you have a Wi-Fi adapter plugged and turned on</property>
+-              </object>
+-            </child>
+-          </object>
+-          <packing>
+-            <property name="name">no-wifi-devices</property>
+-          </packing>
+-        </child>
++            <property name="shadow-type">none</property>
+ 
+-        <!-- Wi-Fi connections and devices -->
+-        <child>
+-          <object class="GtkScrolledWindow">
+-            <property name="visible">True</property>
+-            <property name="can-focus">False</property>
+-            <property name="hscrollbar-policy">never</property>
+             <child>
+-              <object class="GtkViewport">
++              <object class="GtkGrid">
+                 <property name="visible">True</property>
+-                <property name="shadow-type">none</property>
++                <property name="border-width">32</property>
++
++                <!-- Empty boxes to enforce 1/3 width for the main widgets -->
+                 <child>
+-                  <object class="GtkGrid">
++                  <object class="GtkBox">
+                     <property name="visible">True</property>
+-                    <property name="border-width">32</property>
+-
+-                    <!-- Empty boxes to enforce 1/3 width for the main widgets -->
+-                    <child>
+-                      <object class="GtkBox">
+-                        <property name="visible">True</property>
+-                        <property name="hexpand">True</property>
+-                      </object>
+-                      <packing>
+-                        <property name="left-attach">0</property>
+-                        <property name="top-attach">0</property>
+-                        <property name="height">3</property>
+-                      </packing>
+-                    </child>
+-                    <child>
+-                      <object class="GtkBox">
+-                        <property name="visible">True</property>
+-                        <property name="hexpand">True</property>
+-                      </object>
+-                      <packing>
+-                        <property name="left-attach">2</property>
+-                        <property name="top-attach">0</property>
+-                        <property name="height">3</property>
+-                      </packing>
+-                    </child>
++                    <property name="hexpand">True</property>
++                  </object>
++                  <packing>
++                    <property name="left-attach">0</property>
++                    <property name="top-attach">0</property>
++                    <property name="height">3</property>
++                  </packing>
++                </child>
++                <child>
++                  <object class="GtkBox">
++                    <property name="visible">True</property>
++                    <property name="hexpand">True</property>
++                  </object>
++                  <packing>
++                    <property name="left-attach">2</property>
++                    <property name="top-attach">0</property>
++                    <property name="height">3</property>
++                  </packing>
++                </child>
+ 
+-                    <!-- Airplane Mode -->
++                <child>
++                <!-- Airplane Mode -->
++                  <object class="GtkFrame" id="rfkill_widget">
++                    <property name="visible">True</property>
++                    <property name="vexpand">False</property>
++                    <property name="margin_bottom">32</property>
+                     <child>
+-                      <object class="GtkFrame" id="rfkill_widget">
++                      <object class="GtkListBox">
+                         <property name="visible">True</property>
+-                        <property name="vexpand">False</property>
+-                        <property name="margin_bottom">32</property>
++                        <property name="selection-mode">none</property>
+                         <child>
+-                          <object class="GtkListBox">
++                          <object class="GtkListBoxRow">
+                             <property name="visible">True</property>
+-                            <property name="selection-mode">none</property>
++                            <property name="can-focus">False</property>
++                            <property name="activatable">False</property>
+                             <child>
+-                              <object class="GtkListBoxRow">
++                              <object class="GtkGrid">
+                                 <property name="visible">True</property>
+-                                <property name="can-focus">False</property>
+-                                <property name="activatable">False</property>
++                                <property name="border-width">12</property>
++                                <property name="margin_left">6</property>
++                                <property name="margin_right">6</property>
++                                <property name="column-spacing">12</property>
++                                <property name="row-spacing">2</property>
++                                <child>
++                                  <object class="GtkLabel">
++                                    <property name="visible">True</property>
++                                    <property name="hexpand">True</property>
++                                    <property name="label" translatable="yes">Airplane Mode</property>
++                                    <property name="xalign">0.0</property>
++                                    <attributes>
++                                      <attribute name="weight" value="bold"/>
++                                    </attributes>
++                                  </object>
++                                  <packing>
++                                    <property name="left-attach">0</property>
++                                    <property name="top-attach">0</property>
++                                  </packing>
++                                </child>
+                                 <child>
+-                                  <object class="GtkGrid">
++                                  <object class="GtkLabel">
+                                     <property name="visible">True</property>
+-                                    <property name="border-width">12</property>
+-                                    <property name="margin_left">6</property>
+-                                    <property name="margin_right">6</property>
+-                                    <property name="column-spacing">12</property>
+-                                    <property name="row-spacing">2</property>
+-                                    <child>
+-                                      <object class="GtkLabel">
+-                                        <property name="visible">True</property>
+-                                        <property name="hexpand">True</property>
+-                                        <property name="label" translatable="yes">Airplane Mode</property>
+-                                        <property name="xalign">0.0</property>
+-                                        <attributes>
+-                                          <attribute name="weight" value="bold"/>
+-                                        </attributes>
+-                                      </object>
+-                                      <packing>
+-                                        <property name="left-attach">0</property>
+-                                        <property name="top-attach">0</property>
+-                                      </packing>
+-                                    </child>
+-                                    <child>
+-                                      <object class="GtkLabel">
+-                                        <property name="visible">True</property>
+-                                        <property name="hexpand">True</property>
+-                                        <property name="label" translatable="yes">Disables Wi-Fi, Bluetooth and mobile broadband</property>
+-                                        <property name="xalign">0.0</property>
+-                                        <attributes>
+-                                          <attribute name="scale" value="0.88"/>
+-                                        </attributes>
+-                                        <style>
+-                                          <class name="dim-label"/>
+-                                        </style>
+-                                      </object>
+-                                      <packing>
+-                                        <property name="left-attach">0</property>
+-                                        <property name="top-attach">1</property>
+-                                      </packing>
+-                                    </child>
+-                                    <child>
+-                                      <object class="GtkSwitch" id="rfkill_switch">
+-                                        <property name="visible">True</property>
+-                                        <property name="can-focus">True</property>
+-                                        <property name="valign">center</property>
+-                                        <signal name="notify::active" handler="rfkill_switch_notify_activate_cb" object="CcWifiPanel" swapped="no" />
+-                                      </object>
+-                                      <packing>
+-                                        <property name="left-attach">1</property>
+-                                        <property name="top-attach">0</property>
+-                                        <property name="height">2</property>
+-                                      </packing>
+-                                    </child>
++                                    <property name="hexpand">True</property>
++                                    <property name="label" translatable="yes">Disables Wi-Fi, Bluetooth and mobile broadband</property>
++                                    <property name="xalign">0.0</property>
++                                    <attributes>
++                                      <attribute name="scale" value="0.88"/>
++                                    </attributes>
++                                    <style>
++                                      <class name="dim-label"/>
++                                    </style>
+                                   </object>
++                                  <packing>
++                                    <property name="left-attach">0</property>
++                                    <property name="top-attach">1</property>
++                                  </packing>
++                                </child>
++                                <child>
++                                  <object class="GtkSwitch" id="rfkill_switch">
++                                    <property name="visible">True</property>
++                                    <property name="can-focus">True</property>
++                                    <property name="valign">center</property>
++                                    <signal name="notify::active" handler="rfkill_switch_notify_activate_cb" object="CcWifiPanel" swapped="no" />
++                                  </object>
++                                  <packing>
++                                    <property name="left-attach">1</property>
++                                    <property name="top-attach">0</property>
++                                    <property name="height">2</property>
++                                  </packing>
+                                 </child>
+                               </object>
+                             </child>
+                           </object>
+                         </child>
+                       </object>
+-                      <packing>
+-                        <property name="left-attach">1</property>
+-                        <property name="top-attach">0</property>
+-                      </packing>
+                     </child>
++                  </object>
++                  <packing>
++                    <property name="left-attach">1</property>
++                    <property name="top-attach">0</property>
++                  </packing>
++                </child>
+ 
+-                    <!-- Visible Networks label & spinner -->
++                <child>
++                  <object class="GtkStack" id="main_stack">
++                    <property name="visible">True</property>
++                    <property name="can-focus">False</property>
++                    <property name="homogeneous">False</property>
++                    <property name="transition_type">crossfade</property>
++
++                    <!-- "No Wi-Fi Adapter" page -->
+                     <child>
+                       <object class="GtkBox">
+                         <property name="visible">True</property>
+-                        <property name="hexpand">True</property>
+-                        <property name="halign">start</property>
+-                        <property name="spacing">6</property>
++                        <property name="can_focus">False</property>
++                        <property name="expand">True</property>
++                        <property name="halign">center</property>
++                        <property name="valign">start</property>
++                        <property name="orientation">vertical</property>
++                        <child>
++                          <object class="GtkImage">
++                            <property name="visible">True</property>
++                            <property name="can_focus">False</property>
++                            <property name="icon_name">network-wireless-no-route-symbolic</property>
++                            <property name="pixel_size">256</property>
++                            <property name="margin-bottom">18</property>
++                            <style>
++                              <class name="dim-label" />
++                            </style>
++                          </object>
++                        </child>
+                         <child>
+                           <object class="GtkLabel">
+                             <property name="visible">True</property>
+-                            <property name="label" translatable="yes">Visible Networks</property>
+-                            <property name="xalign">0.0</property>
+-                            <property name="margin_bottom">12</property>
++                            <property name="can_focus">False</property>
++                            <property name="wrap">True</property>
++                            <property name="label" translatable="yes">No Wi-Fi Adapter Found</property>
+                             <attributes>
+-                              <attribute name="weight" value="bold"/>
++                              <attribute name="weight" value="bold" />
++                              <attribute name="scale" value="1.2" />
+                             </attributes>
+                           </object>
+                         </child>
+                         <child>
+-                          <object class="GtkSpinner" id="spinner">
+-                            <property name="hexpand">True</property>
++                          <object class="GtkLabel">
++                            <property name="visible">True</property>
++                            <property name="can_focus">False</property>
++                            <property name="wrap">True</property>
++                            <property name="label" translatable="yes">Make sure you have a Wi-Fi adapter plugged and turned on</property>
+                           </object>
+                         </child>
+                       </object>
+                       <packing>
+-                        <property name="left-attach">1</property>
+-                        <property name="top-attach">1</property>
++                        <property name="name">no-wifi-devices</property>
+                       </packing>
+                     </child>
+ 
+-                    <!-- Stack with a listbox for each Wi-Fi device -->
++                    <!-- Wi-Fi connections and devices -->
+                     <child>
+-                      <object class="GtkFrame">
++                      <object class="GtkGrid">
+                         <property name="visible">True</property>
+-                        <property name="valign">start</property>
+-                        <style>
+-                          <class name="view" />
+-                        </style>
++
++                        <!-- Visible Networks label & spinner -->
+                         <child>
+-                          <object class="GtkStack" id="stack">
++                          <object class="GtkBox">
+                             <property name="visible">True</property>
+                             <property name="hexpand">True</property>
+-                            <property name="vexpand">True</property>
+-                            <property name="transition_type">crossfade</property>
++                            <property name="halign">start</property>
++                            <property name="spacing">6</property>
++                            <child>
++                              <object class="GtkLabel">
++                                <property name="visible">True</property>
++                                <property name="label" translatable="yes">Visible Networks</property>
++                                <property name="xalign">0.0</property>
++                                <property name="margin_bottom">12</property>
++                                <attributes>
++                                  <attribute name="weight" value="bold"/>
++                                </attributes>
++                              </object>
++                            </child>
++                            <child>
++                              <object class="GtkSpinner" id="spinner">
++                                <property name="hexpand">True</property>
++                              </object>
++                            </child>
+                           </object>
++                          <packing>
++                            <property name="left-attach">1</property>
++                            <property name="top-attach">1</property>
++                          </packing>
++                        </child>
++
++                        <!-- Stack with a listbox for each Wi-Fi device -->
++                        <child>
++                          <object class="GtkFrame">
++                            <property name="visible">True</property>
++                            <property name="valign">start</property>
++                            <style>
++                              <class name="view" />
++                            </style>
++                            <child>
++                              <object class="GtkStack" id="stack">
++                                <property name="visible">True</property>
++                                <property name="hexpand">True</property>
++                                <property name="vexpand">True</property>
++                                <property name="transition_type">crossfade</property>
++                              </object>
++                            </child>
++                          </object>
++                          <packing>
++                            <property name="left-attach">1</property>
++                            <property name="top-attach">2</property>
++                          </packing>
+                         </child>
+                       </object>
+                       <packing>
+-                        <property name="left-attach">1</property>
+-                        <property name="top-attach">2</property>
++                        <property name="name">wifi-connections</property>
++                      </packing>
++                    </child>
++
++                    <!-- "NetworkManager Not Running" page -->
++                    <child>
++                      <object class="GtkBox">
++                        <property name="visible">True</property>
++                        <property name="can_focus">False</property>
++                        <property name="halign">center</property>
++                        <property name="valign">center</property>
++                        <property name="orientation">vertical</property>
++                        <property name="margin">18</property>
++                        <property name="spacing">18</property>
++                        <child type="center">
++                          <object class="GtkImage">
++                            <property name="visible">True</property>
++                            <property name="can_focus">False</property>
++                            <property name="icon_name">face-sad-symbolic</property>
++                            <property name="pixel_size">128</property>
++                            <style>
++                              <class name="dim-label" />
++                            </style>
++                          </object>
++                        </child>
++                        <child>
++                          <object class="GtkLabel">
++                            <property name="visible">True</property>
++                            <property name="can_focus">False</property>
++                            <property name="wrap">True</property>
++                            <property name="label" translatable="yes">NetworkManager needs to be running</property>
++                          </object>
++                          <packing>
++                            <property name="pack-type">end</property>
++                          </packing>
++                        </child>
++                        <child>
++                          <object class="GtkLabel">
++                            <property name="visible">True</property>
++                            <property name="can_focus">False</property>
++                            <property name="wrap">True</property>
++                            <property name="label" translatable="yes">Oops, something has gone wrong. Please contact your software vendor.</property>
++                            <attributes>
++                              <attribute name="scale" value="1.42" />
++                            </attributes>
++                          </object>
++                          <packing>
++                            <property name="pack-type">end</property>
++                          </packing>
++                        </child>
++                      </object>
++                      <packing>
++                        <property name="name">nm-not-running</property>
+                       </packing>
+                     </child>
+                   </object>
++                    <packing>
++                    <property name="left-attach">1</property>
++                    <property name="top-attach">1</property>
++                    <property name="height">3</property>
++                  </packing>
+                 </child>
+               </object>
+             </child>
+           </object>
+-          <packing>
+-            <property name="name">wifi-connections</property>
+-          </packing>
+-        </child>
+-
+-        <!-- "NetworkManager Not Running" page -->
+-        <child>
+-          <object class="GtkBox">
+-            <property name="visible">True</property>
+-            <property name="can_focus">False</property>
+-            <property name="expand">True</property>
+-            <property name="halign">center</property>
+-            <property name="valign">center</property>
+-            <property name="orientation">vertical</property>
+-            <property name="margin">18</property>
+-            <property name="spacing">18</property>
+-            <child type="center">
+-              <object class="GtkImage">
+-                <property name="visible">True</property>
+-                <property name="can_focus">False</property>
+-                <property name="icon_name">face-sad-symbolic</property>
+-                <property name="pixel_size">128</property>
+-                <style>
+-                  <class name="dim-label" />
+-                </style>
+-              </object>
+-            </child>
+-            <child>
+-              <object class="GtkLabel">
+-                <property name="visible">True</property>
+-                <property name="can_focus">False</property>
+-                <property name="wrap">True</property>
+-                <property name="label" translatable="yes">NetworkManager needs to be running</property>
+-              </object>
+-              <packing>
+-                <property name="pack-type">end</property>
+-              </packing>
+-            </child>
+-            <child>
+-              <object class="GtkLabel">
+-                <property name="visible">True</property>
+-                <property name="can_focus">False</property>
+-                <property name="wrap">True</property>
+-                <property name="label" translatable="yes">Oops, something has gone wrong. Please contact your software vendor.</property>
+-                <attributes>
+-                  <attribute name="scale" value="1.42" />
+-                </attributes>
+-              </object>
+-              <packing>
+-                <property name="pack-type">end</property>
+-              </packing>
+-            </child>
+-          </object>
+-          <packing>
+-            <property name="name">nm-not-running</property>
+-          </packing>
+         </child>
+       </object>
+     </child>
+-- 
+2.34.1
+

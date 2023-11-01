@@ -1,0 +1,41 @@
+From 228857e1f4513c513ca5252b780656d8d8952632 Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Wed, 9 Jun 2021 16:51:10 +0200
+Subject: [PATCH] displays: Don't enlarge display panel artificially
+
+Don't set a size group on the main box, and don't let the padding
+boxes expand, either. This makes the display panel able to fit
+again in a 800x600 resolution.
+---
+ panels/display/cc-display-panel.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/panels/display/cc-display-panel.c b/panels/display/cc-display-panel.c
+index 0b4fa193d..0e7dc131e 100644
+--- a/panels/display/cc-display-panel.c
++++ b/panels/display/cc-display-panel.c
+@@ -541,9 +541,9 @@ static GtkWidget *
+ wrap_in_boxes (GtkWidget *widget)
+ {
+   GtkWidget *box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, PANEL_PADDING);
+-  gtk_box_pack_start (GTK_BOX (box), make_bin(), TRUE, TRUE, 0);
++  gtk_box_pack_start (GTK_BOX (box), make_bin(), FALSE, FALSE, 0);
+   gtk_box_pack_start (GTK_BOX (box), widget, TRUE, TRUE, 0);
+-  gtk_box_pack_start (GTK_BOX (box), make_bin(), TRUE, TRUE, 0);
++  gtk_box_pack_start (GTK_BOX (box), make_bin(), FALSE, FALSE, 0);
+   return box;
+ }
+ 
+@@ -586,9 +586,6 @@ make_main_vbox (GtkSizeGroup *size_group)
+   gtk_widget_set_margin_top (vbox, PANEL_PADDING);
+   gtk_widget_set_margin_bottom (vbox, PANEL_PADDING);
+ 
+-  if (size_group)
+-    gtk_size_group_add_widget (size_group, vbox);
+-
+   return vbox;
+ }
+ 
+-- 
+2.32.0.rc1
+

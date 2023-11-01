@@ -1,0 +1,31 @@
+From 520411840b6cd1b9b72e4a2fd19701aad7145f4f Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Thu, 13 Feb 2020 20:28:29 +0100
+Subject: [PATCH] wacom: Pick libwacom's Generic Pen stylus if tool ID is 0
+
+We generally use tool ID 0 if the ID is actually unknown, libwacom however
+assigns 0xfffff to such device. Make it sure we find the "Generic Pen"
+stylus description in that case.
+---
+ panels/wacom/cc-wacom-tool.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/panels/wacom/cc-wacom-tool.c b/panels/wacom/cc-wacom-tool.c
+index 1316fa5d6..d54de6160 100644
+--- a/panels/wacom/cc-wacom-tool.c
++++ b/panels/wacom/cc-wacom-tool.c
+@@ -165,7 +165,10 @@ cc_wacom_tool_initable_init (GInitable     *initable,
+ 			tool->id = ids[0];
+ 	}
+ 
+-	tool->wstylus = libwacom_stylus_get_for_id (wacom_db, tool->id);
++	if (tool->id == 0)
++		tool->wstylus = libwacom_stylus_get_for_id (wacom_db, 0xfffff);
++	else
++		tool->wstylus = libwacom_stylus_get_for_id (wacom_db, tool->id);
+ 
+ 	if (!tool->wstylus) {
+ 		g_set_error (error, 0, 0, "Stylus description not found");
+-- 
+2.25.0
+

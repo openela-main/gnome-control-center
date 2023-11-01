@@ -1,0 +1,40 @@
+From 3f7c47e70915bb085d956d0b3c36d36e4c0da05b Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Mon, 16 Dec 2019 14:06:43 +0100
+Subject: [PATCH] network: Use connect object on signals
+
+This ensures the signals are disconnected on panel finalization.
+---
+ panels/network/cc-network-panel.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/panels/network/cc-network-panel.c b/panels/network/cc-network-panel.c
+index 1a072a65a..deb4b967e 100644
+--- a/panels/network/cc-network-panel.c
++++ b/panels/network/cc-network-panel.c
+@@ -881,14 +881,14 @@ cc_network_panel_init (CcNetworkPanel *panel)
+ 
+         /* use NetworkManager client */
+         panel->client = nm_client_new (NULL, NULL);
+-        g_signal_connect (panel->client, "notify::nm-running" ,
+-                          G_CALLBACK (manager_running), panel);
+-        g_signal_connect (panel->client, "notify::active-connections",
+-                          G_CALLBACK (active_connections_changed), panel);
+-        g_signal_connect (panel->client, "device-added",
+-                          G_CALLBACK (device_added_cb), panel);
+-        g_signal_connect (panel->client, "device-removed",
+-                          G_CALLBACK (device_removed_cb), panel);
++        g_signal_connect_object (panel->client, "notify::nm-running" ,
++                                 G_CALLBACK (manager_running), panel, 0);
++        g_signal_connect_object (panel->client, "notify::active-connections",
++                                 G_CALLBACK (active_connections_changed), panel, 0);
++        g_signal_connect_object (panel->client, "device-added",
++                                 G_CALLBACK (device_added_cb), panel, 0);
++        g_signal_connect_object (panel->client, "device-removed",
++                                 G_CALLBACK (device_removed_cb), panel, 0);
+ 
+         /* Setup ModemManager client */
+         system_bus = g_bus_get_sync (G_BUS_TYPE_SYSTEM, NULL, &error);
+-- 
+2.24.0
+
