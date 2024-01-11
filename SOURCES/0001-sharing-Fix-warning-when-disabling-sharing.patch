@@ -1,0 +1,30 @@
+From 5502611f0cfe7083c2b2a650385ea4554cb73ac9 Mon Sep 17 00:00:00 2001
+From: Robert Ancell <robert.ancell@canonical.com>
+Date: Mon, 15 Oct 2018 11:49:19 +1300
+Subject: [PATCH 3/4] sharing: Fix warning when disabling sharing
+
+The warning is:
+(gnome-control-center:29760): Gtk-CRITICAL **: 11:45:48.076: gtk_widget_is_visible: assertion 'GTK_IS_WIDGET (widget)' failed
+
+This is due to the code trying to disable switches that only exist if support
+for that feature is available.
+---
+ panels/sharing/cc-sharing-panel.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/panels/sharing/cc-sharing-panel.c b/panels/sharing/cc-sharing-panel.c
+index 8b35c9a31..98f2d69ef 100644
+--- a/panels/sharing/cc-sharing-panel.c
++++ b/panels/sharing/cc-sharing-panel.c
+@@ -91,7 +91,7 @@ struct _CcSharingPanelPrivate
+   guint remote_desktop_name_watch;
+ };
+ 
+-#define OFF_IF_VISIBLE(x) { if (gtk_widget_is_visible(x) && gtk_widget_is_sensitive(x)) gtk_switch_set_active (GTK_SWITCH(x), FALSE); }
++#define OFF_IF_VISIBLE(x) { if ((x) != NULL && gtk_widget_is_visible(x) && gtk_widget_is_sensitive(x)) gtk_switch_set_active (GTK_SWITCH(x), FALSE); }
+ 
+ static void
+ cc_sharing_panel_master_switch_notify (GtkSwitch      *gtkswitch,
+-- 
+2.24.0
+

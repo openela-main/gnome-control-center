@@ -1,0 +1,72 @@
+From 0f7a591fa691bc826cee19ae01a6338145119aee Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Thu, 12 Dec 2019 16:20:57 +0100
+Subject: [PATCH] network: Make IPv4/v6 pages drive the scrolledwindow
+ adjustments
+
+Those 2 pages in the connection editor dialog are scrollable, but don't
+hook focus changes so they drive the adjustments. Make them do so.
+---
+ panels/network/connection-editor/ce-page-ip4.c | 3 +++
+ panels/network/connection-editor/ce-page-ip6.c | 3 +++
+ panels/network/connection-editor/ip4-page.ui   | 2 +-
+ panels/network/connection-editor/ip6-page.ui   | 2 +-
+ 4 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/panels/network/connection-editor/ce-page-ip4.c b/panels/network/connection-editor/ce-page-ip4.c
+index 400dc433d..d79e9a3dd 100644
+--- a/panels/network/connection-editor/ce-page-ip4.c
++++ b/panels/network/connection-editor/ce-page-ip4.c
+@@ -515,6 +515,9 @@ connect_ip4_page (CEPageIP4 *page)
+         gboolean disabled;
+         guint method, i;
+ 
++        gtk_container_set_focus_vadjustment (GTK_CONTAINER (gtk_builder_get_object (CE_PAGE (page)->builder, "main_box")),
++                                             gtk_scrolled_window_get_vadjustment (gtk_builder_get_object (CE_PAGE (page)->builder, "page")));
++
+         add_address_section (page);
+         add_dns_section (page);
+         add_routes_section (page);
+diff --git a/panels/network/connection-editor/ce-page-ip6.c b/panels/network/connection-editor/ce-page-ip6.c
+index 995197504..f7105cc5b 100644
+--- a/panels/network/connection-editor/ce-page-ip6.c
++++ b/panels/network/connection-editor/ce-page-ip6.c
+@@ -485,6 +485,9 @@ connect_ip6_page (CEPageIP6 *page)
+         gboolean disabled;
+         guint method, i;
+ 
++        gtk_container_set_focus_vadjustment (GTK_CONTAINER (gtk_builder_get_object (CE_PAGE (page)->builder, "main_box")),
++                                             gtk_scrolled_window_get_vadjustment (gtk_builder_get_object (CE_PAGE (page)->builder, "page")));
++
+         add_address_section (page);
+         add_dns_section (page);
+         add_routes_section (page);
+diff --git a/panels/network/connection-editor/ip4-page.ui b/panels/network/connection-editor/ip4-page.ui
+index fe5d407c9..597987d57 100644
+--- a/panels/network/connection-editor/ip4-page.ui
++++ b/panels/network/connection-editor/ip4-page.ui
+@@ -10,7 +10,7 @@
+         <property name="visible">True</property>
+         <property name="can_focus">False</property>
+         <child>
+-          <object class="GtkGrid">
++          <object class="GtkGrid" id="main_box">
+             <property name="visible">True</property>
+             <property name="can_focus">False</property>
+             <property name="margin_start">24</property>
+diff --git a/panels/network/connection-editor/ip6-page.ui b/panels/network/connection-editor/ip6-page.ui
+index 6d39bd0ec..5164b1004 100644
+--- a/panels/network/connection-editor/ip6-page.ui
++++ b/panels/network/connection-editor/ip6-page.ui
+@@ -10,7 +10,7 @@
+         <property name="visible">True</property>
+         <property name="can_focus">False</property>
+         <child>
+-          <object class="GtkGrid">
++          <object class="GtkGrid" id="main_box">
+             <property name="visible">True</property>
+             <property name="can_focus">False</property>
+             <property name="margin_start">24</property>
+-- 
+2.23.0
+

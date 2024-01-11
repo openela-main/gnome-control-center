@@ -1,0 +1,72 @@
+From 7a4532ff72a74ce74dee4b96b993ecd11f557acc Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Mon, 11 Feb 2019 20:48:23 +0100
+Subject: [PATCH] wacom: Update "Test your settings" button sensitivity on
+ device availability
+
+The button/popover are meaningless if there's no device to test with. Set
+it inactive (so the popover hides if visible) and set insensitive if no
+devices are found.
+
+https://gitlab.gnome.org/GNOME/gnome-control-center/merge_requests/390
+---
+ panels/wacom/cc-wacom-panel.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/panels/wacom/cc-wacom-panel.c b/panels/wacom/cc-wacom-panel.c
+index 77a1e261f..e4f3ca7fc 100644
+--- a/panels/wacom/cc-wacom-panel.c
++++ b/panels/wacom/cc-wacom-panel.c
+@@ -53,6 +53,7 @@ struct _CcWacomPanelPrivate
+ 	GtkWidget        *stylus_notebook;
+ 	GtkWidget        *test_popover;
+ 	GtkWidget        *test_draw_area;
++	GtkWidget        *test_button;
+ 	GHashTable       *devices; /* key=GsdDevice, value=CcWacomDevice */
+ 	GHashTable       *pages; /* key=device name, value=GtkWidget */
+ 	GHashTable       *stylus_pages; /* key=CcWacomTool, value=GtkWidget */
+@@ -309,6 +310,22 @@ add_stylus (CcWacomPanel *self,
+ 	return TRUE;
+ }
+ 
++static void
++update_test_button (CcWacomPanel *self)
++{
++	CcWacomPanelPrivate *priv = self->priv;;
++
++	if (!priv->test_button)
++		return;
++
++	if (g_hash_table_size (priv->devices) == 0) {
++		gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (priv->test_button), FALSE);
++		gtk_widget_set_sensitive (priv->test_button, FALSE);
++	} else {
++		gtk_widget_set_sensitive (priv->test_button, TRUE);
++	}
++}
++
+ static void
+ update_current_tool (CcWacomPanel  *panel,
+ 		     GdkDevice     *device,
+@@ -422,6 +439,9 @@ cc_wacom_panel_constructed (GObject *object)
+ 
+ 	g_signal_connect_object (shell, "event",
+ 				 G_CALLBACK (on_shell_event_cb), self, 0);
++
++	priv->test_button = button;
++	update_test_button (self);
+ }
+ 
+ static const char *
+@@ -561,6 +581,8 @@ update_current_page (CcWacomPanel  *self,
+ 		if (num_pages > 1)
+ 			gtk_notebook_set_current_page (GTK_NOTEBOOK (priv->tablet_notebook), 1);
+ 	}
++
++	update_test_button (self);
+ }
+ 
+ static void
+-- 
+2.20.1
+

@@ -1,0 +1,383 @@
+From f135d985e80c85e1578cd60eeb79bd974788031f Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Wed, 14 Feb 2018 20:52:37 +0800
+Subject: [PATCH] sharing: Enable settings widget for gnome-remote-desktop
+
+Enable support for manipulating GNOME Remote Desktop settings. Settings
+are done via the org.gnome.desktop.remote-desktop.vnc schema.
+Configuring the VNC password is done via libsecret, thus libsecret is
+added as a dependency.
+---
+ meson.build                              |   1 +
+ panels/sharing/cc-gnome-remote-desktop.c | 171 +++++++++++++++++++++++
+ panels/sharing/cc-gnome-remote-desktop.h |  49 +++++++
+ panels/sharing/cc-sharing-panel.c        |  62 +++++++-
+ panels/sharing/meson.build               |   3 +-
+ 5 files changed, 282 insertions(+), 4 deletions(-)
+ create mode 100644 panels/sharing/cc-gnome-remote-desktop.c
+ create mode 100644 panels/sharing/cc-gnome-remote-desktop.h
+
+diff --git a/meson.build b/meson.build
+index 84e04334c..3017b180a 100644
+--- a/meson.build
++++ b/meson.build
+@@ -109,6 +109,7 @@ pulse_mainloop_dep = dependency('libpulse-mainloop-glib', version: pulse_req_ver
+ upower_glib_dep = dependency('upower-glib', version: '>= 0.99.6')
+ x11_dep = dependency('x11')
+ xi_dep = dependency('xi', version: '>= 1.2')
++libsecret_dep = dependency('libsecret-1')
+ 
+ m_dep = cc.find_library('m')
+ 
+diff --git a/panels/sharing/cc-gnome-remote-desktop.c b/panels/sharing/cc-gnome-remote-desktop.c
+new file mode 100644
+index 000000000..8420fddca
+--- /dev/null
++++ b/panels/sharing/cc-gnome-remote-desktop.c
+@@ -0,0 +1,171 @@
++/*
++ * Copyright (C) 2018 Red Hat, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ *
++ */
++
++#include "config.h"
++
++#include "cc-gnome-remote-desktop.h"
++
++const SecretSchema *
++cc_grd_vnc_password_get_schema (void)
++{
++  static const SecretSchema grd_vnc_password_schema = {
++    .name = "org.gnome.RemoteDesktop.VncPassword",
++    .flags = SECRET_SCHEMA_NONE,
++    .attributes = {
++      { "password", SECRET_SCHEMA_ATTRIBUTE_STRING },
++      { "NULL", 0 },
++    },
++  };
++
++  return &grd_vnc_password_schema;
++}
++
++gboolean
++cc_grd_get_is_auth_method_prompt (GValue   *value,
++                                  GVariant *variant,
++                                  gpointer  user_data)
++{
++  const char * auth_method;
++
++  auth_method = g_variant_get_string (variant, NULL);
++
++  if (g_strcmp0 (auth_method, "prompt") == 0)
++    {
++      g_value_set_boolean (value, TRUE);
++    }
++  else if (g_strcmp0 (auth_method, "password") == 0)
++    {
++      g_value_set_boolean (value, FALSE);
++    }
++  else
++    {
++      g_warning ("Unhandled VNC auth method %s", auth_method);
++      g_value_set_boolean (value, FALSE);
++    }
++
++  return TRUE;
++}
++
++GVariant *
++cc_grd_set_is_auth_method_prompt (const GValue       *value,
++                                  const GVariantType *type,
++                                  gpointer            user_data)
++{
++  char *auth_method;
++
++  if (g_value_get_boolean (value))
++    auth_method = "prompt";
++  else
++    auth_method = "password";
++
++  return g_variant_new_string (auth_method);
++}
++
++gboolean
++cc_grd_get_is_auth_method_password (GValue   *value,
++                                    GVariant *variant,
++                                    gpointer  user_data)
++{
++  const char *auth_method;
++
++  auth_method = g_variant_get_string (variant, NULL);
++
++  if (g_strcmp0 (auth_method, "prompt") == 0)
++    {
++      g_value_set_boolean (value, FALSE);
++    }
++  else if (g_strcmp0 (auth_method, "password") == 0)
++    {
++      g_value_set_boolean (value, TRUE);
++    }
++  else
++    {
++      g_warning ("Unhandled VNC auth method %s", auth_method);
++      g_value_set_boolean (value, FALSE);
++    }
++
++  return TRUE;
++}
++
++GVariant *
++cc_grd_set_is_auth_method_password (const GValue       *value,
++                                    const GVariantType *type,
++                                    gpointer            user_data)
++{
++  char *auth_method;
++
++  if (g_value_get_boolean (value))
++    auth_method = "password";
++  else
++    auth_method = "prompt";
++
++  return g_variant_new_string (auth_method);
++}
++
++static void
++on_password_stored (GObject      *source,
++                    GAsyncResult *result,
++                    gpointer      user_data)
++{
++  GtkEntry *entry = GTK_ENTRY (user_data);
++  GError *error = NULL;
++
++  if (!secret_password_store_finish (result, &error))
++    {
++      if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
++        {
++          g_warning ("Failed to store VNC password: %s", error->message);
++          g_object_set_data (G_OBJECT (entry),
++                             "vnc-password-cancellable", NULL);
++        }
++      g_error_free (error);
++    }
++  else
++    {
++      g_object_set_data (G_OBJECT (entry),
++                         "vnc-password-cancellable", NULL);
++    }
++}
++
++void
++cc_grd_on_vnc_password_entry_notify_text (GtkEntry   *entry,
++                                          GParamSpec *pspec,
++                                          gpointer    user_data)
++{
++  GCancellable *cancellable;
++  const char *password;
++
++  cancellable = g_object_get_data (G_OBJECT (entry), "vnc-password-cancellable");
++  if (cancellable)
++    g_cancellable_cancel (cancellable);
++
++  cancellable = g_cancellable_new ();
++  g_object_set_data_full (G_OBJECT (entry),
++                          "vnc-password-cancellable",
++                          cancellable, g_object_unref);
++
++  password = gtk_entry_get_text (entry);
++
++  secret_password_store (CC_GRD_VNC_PASSWORD_SCHEMA,
++                         SECRET_COLLECTION_DEFAULT,
++                         "GNOME Remote Desktop VNC password",
++                         password,
++                         cancellable, on_password_stored, entry,
++                         NULL);
++}
+diff --git a/panels/sharing/cc-gnome-remote-desktop.h b/panels/sharing/cc-gnome-remote-desktop.h
+new file mode 100644
+index 000000000..2a4819986
+--- /dev/null
++++ b/panels/sharing/cc-gnome-remote-desktop.h
+@@ -0,0 +1,49 @@
++/*
++ * Copyright (C) 2018 Red Hat, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ *
++ */
++
++#ifndef CC_GNOME_REMOTE_DESKTOP_H
++#define CC_GNOME_REMOTE_DESKTOP_H
++
++#include <gtk/gtk.h>
++#include <libsecret/secret.h>
++
++const SecretSchema * cc_grd_vnc_password_get_schema (void);
++#define CC_GRD_VNC_PASSWORD_SCHEMA cc_grd_vnc_password_get_schema ()
++
++gboolean cc_grd_get_is_auth_method_prompt (GValue   *value,
++                                           GVariant *variant,
++                                           gpointer  user_data);
++
++GVariant * cc_grd_set_is_auth_method_prompt (const GValue       *value,
++                                             const GVariantType *type,
++                                             gpointer            user_data);
++
++gboolean cc_grd_get_is_auth_method_password (GValue   *value,
++                                             GVariant *variant,
++                                             gpointer  user_data);
++
++GVariant * cc_grd_set_is_auth_method_password (const GValue       *value,
++                                               const GVariantType *type,
++                                               gpointer            user_data);
++
++void cc_grd_on_vnc_password_entry_notify_text (GtkEntry   *entry,
++                                               GParamSpec *pspec,
++                                               gpointer    user_data);
++
++#endif /* CC_GNOME_REMOTE_DESKTOP_H */
+diff --git a/panels/sharing/cc-sharing-panel.c b/panels/sharing/cc-sharing-panel.c
+index 8b35c9a31..adcbcdc86 100644
+--- a/panels/sharing/cc-sharing-panel.c
++++ b/panels/sharing/cc-sharing-panel.c
+@@ -30,6 +30,7 @@
+ #include "cc-media-sharing.h"
+ #include "cc-sharing-networks.h"
+ #include "cc-sharing-switch.h"
++#include "cc-gnome-remote-desktop.h"
+ #include "org.gnome.SettingsDaemon.Sharing.h"
+ 
+ #ifdef GDK_WINDOWING_WAYLAND
+@@ -66,6 +67,13 @@ _gtk_builder_get_widget (GtkBuilder  *builder,
+ #define VINO_SCHEMA_ID "org.gnome.Vino"
+ #define FILE_SHARING_SCHEMA_ID "org.gnome.desktop.file-sharing"
+ #define GNOME_REMOTE_DESKTOP_SCHEMA_ID "org.gnome.desktop.remote-desktop"
++#define GNOME_REMOTE_DESKTOP_VNC_SCHEMA_ID "org.gnome.desktop.remote-desktop.vnc"
++
++typedef enum
++{
++  GRD_VNC_AUTH_METHOD_PROMPT,
++  GRD_VNC_AUTH_METHOD_PASSWORD
++} GrdVncAuthMethod;
+ 
+ struct _CcSharingPanelPrivate
+ {
+@@ -1077,11 +1085,56 @@ static void
+ cc_sharing_panel_setup_screen_sharing_dialog_gnome_remote_desktop (CcSharingPanel *self)
+ {
+   CcSharingPanelPrivate *priv = self->priv;
+-  GtkWidget *networks, *w;
++  GSettings *vnc_settings;
++  GtkWidget *networks, *box, *w;
++
++  cc_sharing_panel_bind_switch_to_widgets (WID ("require-password-radiobutton"),
++                                           WID ("password-grid"),
++                                           NULL);
++
++  cc_sharing_panel_setup_label_with_hostname (self,
++                                              WID ("screen-sharing-label"));
++
++  g_object_bind_property (WID ("show-password-checkbutton"), "active",
++                          WID ("remote-control-password-entry"), "visibility",
++                          G_BINDING_SYNC_CREATE);
++
++  /* make sure the password entry is hidden by default */
++  g_signal_connect (priv->screen_sharing_dialog, "show",
++                    G_CALLBACK (screen_sharing_show_cb), self);
++
++  g_signal_connect (priv->screen_sharing_dialog, "hide",
++                    G_CALLBACK (screen_sharing_hide_cb), self);
++
++  /* accept at most 8 bytes in password entry */
++  g_signal_connect (WID ("remote-control-password-entry"), "insert-text",
++                    G_CALLBACK (screen_sharing_password_insert_text_cb), self);
++
++  /* Bind settings to widgets */
++  vnc_settings = g_settings_new (GNOME_REMOTE_DESKTOP_VNC_SCHEMA_ID);
++  g_settings_bind (vnc_settings, "view-only",
++                   WID ("remote-control-checkbutton"), "active",
++                   G_SETTINGS_BIND_DEFAULT | G_SETTINGS_BIND_INVERT_BOOLEAN);
++  g_settings_bind_with_mapping (vnc_settings, "auth-method",
++                                WID ("approve-connections-radiobutton"), "active",
++                                G_SETTINGS_BIND_DEFAULT,
++                                cc_grd_get_is_auth_method_prompt,
++                                cc_grd_set_is_auth_method_prompt,
++                                NULL, NULL);
++  g_settings_bind_with_mapping (vnc_settings, "auth-method",
++                                WID ("require-password-radiobutton"), "active",
++                                G_SETTINGS_BIND_DEFAULT,
++                                cc_grd_get_is_auth_method_password,
++                                cc_grd_set_is_auth_method_password,
++                                NULL, NULL);
++  g_signal_connect (WID ("remote-control-password-entry"),
++                    "notify::text",
++                    G_CALLBACK (cc_grd_on_vnc_password_entry_notify_text),
++                    self);
+ 
+   networks = cc_sharing_networks_new (self->priv->sharing_proxy, "gnome-remote-desktop");
+-  gtk_widget_hide (WID ("remote-control-box"));
+-  gtk_grid_attach (GTK_GRID (WID ("grid3")), networks, 0, 1, 2, 1);
++  box = WID ("remote-control-box");
++  gtk_box_pack_end (GTK_BOX (box), networks, TRUE, TRUE, 0);
+   gtk_widget_show (networks);
+ 
+   w = cc_sharing_switch_new (networks);
+@@ -1116,6 +1169,9 @@ check_remote_desktop_available (CcSharingPanel *self)
+   if (!cc_sharing_panel_check_schema_available (self, GNOME_REMOTE_DESKTOP_SCHEMA_ID))
+     return;
+ 
++  if (!cc_sharing_panel_check_schema_available (self, GNOME_REMOTE_DESKTOP_VNC_SCHEMA_ID))
++    return;
++
+   priv->remote_desktop_name_watch = g_bus_watch_name (G_BUS_TYPE_SESSION,
+                                                       "org.gnome.Mutter.RemoteDesktop",
+                                                       G_BUS_NAME_WATCHER_FLAGS_NONE,
+diff --git a/panels/sharing/meson.build b/panels/sharing/meson.build
+index 5caac36c0..1565a089a 100644
+--- a/panels/sharing/meson.build
++++ b/panels/sharing/meson.build
+@@ -43,6 +43,7 @@ sources = files(
+   'cc-remote-login.c',
+   'cc-sharing-networks.c',
+   'cc-sharing-switch.c',
++  'cc-gnome-remote-desktop.c',
+   'file-share-properties.c',
+   'vino-preferences.c'
+ )
+@@ -79,7 +80,7 @@ panels_libs += static_library(
+   cappletname,
+   sources: sources,
+   include_directories: top_inc,
+-  dependencies: common_deps,
++  dependencies: [common_deps, libsecret_dep],
+   c_args: cflags
+ )
+ 
+-- 
+2.17.1
+

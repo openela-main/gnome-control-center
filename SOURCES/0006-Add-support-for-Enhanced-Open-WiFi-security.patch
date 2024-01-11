@@ -1,0 +1,114 @@
+From 73fb050f06649e717aea5654394fe45cd921d4df Mon Sep 17 00:00:00 2001
+From: David Bauer <mail@david-bauer.net>
+Date: Fri, 17 Jul 2020 03:41:44 +0000
+Subject: [PATCH 6/8] Add support for Enhanced Open WiFi security
+
+(cherry picked from commit 1d0b664f7c5e38e9d8933956c1cc4661244edb7d)
+---
+ .../connection-editor/ce-page-details.c       |  6 +++++
+ .../connection-editor/ce-page-security.c      | 22 +++++++++++++++++++
+ panels/network/net-device-wifi.c              | 10 +++++++--
+ 3 files changed, 36 insertions(+), 2 deletions(-)
+
+diff --git a/panels/network/connection-editor/ce-page-details.c b/panels/network/connection-editor/ce-page-details.c
+index f0c594dd4..8bdb932a4 100644
+--- a/panels/network/connection-editor/ce-page-details.c
++++ b/panels/network/connection-editor/ce-page-details.c
+@@ -65,6 +65,12 @@ get_ap_security_string (NMAccessPoint *ap)
+                         /* TRANSLATORS: this WPA3 WiFi security */
+                         g_string_append_printf (str, "%s, ", _("WPA3"));
+                 }
++#if NM_CHECK_VERSION(1,24,0)
++		else if (rsn_flags & NM_802_11_AP_SEC_KEY_MGMT_OWE) {
++			/* TRANSLATORS: this Enhanced Open WiFi security */
++                        g_string_append_printf (str, "%s, ", _("Enhanced Open"));
++		}
++#endif
+ 		else
+ #endif
+ 		{
+diff --git a/panels/network/connection-editor/ce-page-security.c b/panels/network/connection-editor/ce-page-security.c
+index 37b1e1286..52efb9da1 100644
+--- a/panels/network/connection-editor/ce-page-security.c
++++ b/panels/network/connection-editor/ce-page-security.c
+@@ -68,6 +68,13 @@ get_default_type_for_security (NMSettingWirelessSecurity *sec)
+                         return NMU_SEC_LEAP;
+                 return NMU_SEC_DYNAMIC_WEP;
+         }
++
++#if NM_CHECK_VERSION(1,24,0)
++        if (!strcmp (key_mgmt, "owe")) {
++                return NMU_SEC_OWE;
++        }
++#endif
++
+ #if NM_CHECK_VERSION(1,20,6)
+         if (!strcmp (key_mgmt, "sae")) {
+                 return NMU_SEC_SAE;
+@@ -255,6 +262,18 @@ finish_setup (CEPageSecurity *page)
+                 item++;
+         }
+ 
++#if NM_CHECK_VERSION(1,24,0)
++        if (nm_utils_security_valid (NMU_SEC_OWE, dev_caps, FALSE, is_adhoc, 0, 0, 0)) {
++		gtk_list_store_insert_with_values (sec_model, &iter, -1,
++                                                   S_NAME_COLUMN, _("Enhanced Open"),
++                                                   S_ADHOC_VALID_COLUMN, FALSE,
++                                                   -1);
++		if (active < 0 && default_type == NMU_SEC_OWE)
++			active = item;
++		item++;
++        }
++#endif
++
+         if (nm_utils_security_valid (NMU_SEC_STATIC_WEP, dev_caps, FALSE, is_adhoc, 0, 0, 0)) {
+                 WirelessSecurityWEPKey *ws_wep;
+                 NMWepKeyType wep_type = NM_WEP_KEY_TYPE_KEY;
+@@ -473,6 +492,9 @@ ce_page_security_new (NMConnection      *connection,
+             default_type == NMU_SEC_WPA_PSK ||
+ #if NM_CHECK_VERSION(1,20,6)
+ 	    default_type == NMU_SEC_SAE ||
++#endif
++#if NM_CHECK_VERSION(1,24,0)
++	    default_type == NMU_SEC_OWE ||
+ #endif
+             default_type == NMU_SEC_WPA2_PSK) {
+                 CE_PAGE (page)->security_setting = NM_SETTING_WIRELESS_SECURITY_SETTING_NAME;
+diff --git a/panels/network/net-device-wifi.c b/panels/network/net-device-wifi.c
+index da1e4837a..fc2fba63f 100644
+--- a/panels/network/net-device-wifi.c
++++ b/panels/network/net-device-wifi.c
+@@ -47,7 +47,8 @@ typedef enum {
+   NM_AP_SEC_WEP,
+   NM_AP_SEC_WPA,
+   NM_AP_SEC_WPA2,
+-  NM_AP_SEC_SAE
++  NM_AP_SEC_SAE,
++  NM_AP_SEC_OWE,
+ } NMAccessPointSecurity;
+ 
+ static void nm_device_wifi_refresh_ui (NetDeviceWifi *device_wifi);
+@@ -150,6 +151,10 @@ get_access_point_security (NMAccessPoint *ap)
+ #if NM_CHECK_VERSION(1,20,6)
+         else if (rsn_flags & NM_802_11_AP_SEC_KEY_MGMT_SAE)
+                 type = NM_AP_SEC_SAE;
++#endif
++#if NM_CHECK_VERSION(1,20,6)
++        else if (rsn_flags & NM_802_11_AP_SEC_KEY_MGMT_OWE)
++                type = NM_AP_SEC_OWE;
+ #endif
+         else
+                 type = NM_AP_SEC_WPA2;
+@@ -1930,7 +1935,8 @@ make_row (GtkSizeGroup   *rows,
+ 
+         if (in_range) {
+                 if (security != NM_AP_SEC_UNKNOWN &&
+-                    security != NM_AP_SEC_NONE) {
++                    security != NM_AP_SEC_NONE &&
++                    security != NM_AP_SEC_OWE) {
+                         widget = gtk_image_new_from_icon_name ("network-wireless-encrypted-symbolic", GTK_ICON_SIZE_MENU);
+                 } else {
+                         widget = gtk_label_new ("");
+-- 
+2.34.1
+

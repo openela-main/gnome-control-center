@@ -1,0 +1,37 @@
+From 17ca12acd4e0a924a1acd5107b8569dd66d368af Mon Sep 17 00:00:00 2001
+From: David Bauer <mail@david-bauer.net>
+Date: Sat, 21 Dec 2019 17:39:02 +0100
+Subject: [PATCH 3/8] ce-page-details: add SAE support
+
+(cherry picked from commit 97f6c8f53c15c7ccb9dd7a65ce1ac02ebc18a724)
+---
+ panels/network/connection-editor/ce-page-details.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/panels/network/connection-editor/ce-page-details.c b/panels/network/connection-editor/ce-page-details.c
+index c972c0e5b..f0c594dd4 100644
+--- a/panels/network/connection-editor/ce-page-details.c
++++ b/panels/network/connection-editor/ce-page-details.c
+@@ -60,8 +60,17 @@ get_ap_security_string (NMAccessPoint *ap)
+                 g_string_append_printf (str, "%s, ", _("WPA"));
+         }
+         if (rsn_flags != NM_802_11_AP_SEC_NONE) {
+-                /* TRANSLATORS: this WPA WiFi security */
+-                g_string_append_printf (str, "%s, ", _("WPA2"));
++#if NM_CHECK_VERSION(1,20,6)
++                if (rsn_flags & NM_802_11_AP_SEC_KEY_MGMT_SAE) {
++                        /* TRANSLATORS: this WPA3 WiFi security */
++                        g_string_append_printf (str, "%s, ", _("WPA3"));
++                }
++		else
++#endif
++		{
++                        /* TRANSLATORS: this WPA WiFi security */
++                        g_string_append_printf (str, "%s, ", _("WPA2"));
++                }
+         }
+         if ((wpa_flags & NM_802_11_AP_SEC_KEY_MGMT_802_1X) ||
+             (rsn_flags & NM_802_11_AP_SEC_KEY_MGMT_802_1X)) {
+-- 
+2.34.1
+

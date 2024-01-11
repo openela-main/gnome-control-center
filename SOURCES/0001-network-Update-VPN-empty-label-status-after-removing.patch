@@ -1,0 +1,63 @@
+From 3f089ddbd8cc304c563b4ed8cfbc59d27ffadc00 Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Thu, 12 Dec 2019 22:43:15 +0100
+Subject: [PATCH] network: Update VPN empty label status after removing VPN
+ connection
+
+Being the VPN list actually a collection of listboxes, this function
+ensures it looks alright in other places. However the case of removing
+all VPN connections till we're back empty was missed.
+---
+ panels/network/cc-network-panel.c | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/panels/network/cc-network-panel.c b/panels/network/cc-network-panel.c
+index 1a072a65a..f08d9b939 100644
+--- a/panels/network/cc-network-panel.c
++++ b/panels/network/cc-network-panel.c
+@@ -761,6 +761,33 @@ notify_connection_added_cb (NMClient           *client,
+         add_connection (panel, NM_CONNECTION (connection));
+ }
+ 
++static void
++notify_connection_removed_cb (NMClient           *client,
++                              NMRemoteConnection *connection,
++                              CcNetworkPanel     *panel)
++{
++        guint i;
++
++        for (i = 0; i < panel->devices->len; i++) {
++                NetObject *object = g_ptr_array_index (panel->devices, i);
++                NMConnection *vpn_conn;
++                gboolean equal;
++
++                if (!NET_IS_VPN (object))
++                        continue;
++
++                g_object_get (object, "connection", &vpn_conn, NULL);
++                equal = vpn_conn == NM_CONNECTION (connection);
++                g_object_unref (vpn_conn);
++
++                if (equal) {
++                        g_ptr_array_remove (panel->devices, object);
++                        update_vpn_section (panel);
++                        return;
++                }
++        }
++}
++
+ static void
+ panel_check_network_manager_version (CcNetworkPanel *panel)
+ {
+@@ -912,6 +939,8 @@ cc_network_panel_init (CcNetworkPanel *panel)
+         /* add remote settings such as VPN settings as virtual devices */
+         g_signal_connect (panel->client, NM_CLIENT_CONNECTION_ADDED,
+                           G_CALLBACK (notify_connection_added_cb), panel);
++        g_signal_connect (panel->client, NM_CLIENT_CONNECTION_REMOVED,
++                          G_CALLBACK (notify_connection_removed_cb), panel);
+ 
+         toplevel = gtk_widget_get_toplevel (GTK_WIDGET (panel));
+         g_signal_connect_after (toplevel, "map", G_CALLBACK (on_toplevel_map), panel);
+-- 
+2.23.0
+

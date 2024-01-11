@@ -1,0 +1,55 @@
+From 06b1f439c05a20b790cebb850d8ba514249583c4 Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Tue, 3 Dec 2019 16:56:59 +0100
+Subject: [PATCH] network: Use g_signal_connect_object() when dealing with
+ NMClient
+
+We may get signal emissions and property changes during NMClient
+destruction, triggered from CcWifiPanel destruction. This triggers
+callbacks that were not meant to trigger on panel destruction.
+---
+ panels/network/cc-wifi-panel.c | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/panels/network/cc-wifi-panel.c b/panels/network/cc-wifi-panel.c
+index 2c1cd17b7..7dd182e59 100644
+--- a/panels/network/cc-wifi-panel.c
++++ b/panels/network/cc-wifi-panel.c
+@@ -621,20 +621,20 @@ cc_wifi_panel_init (CcWifiPanel *self)
+   /* Load NetworkManager */
+   self->client = nm_client_new (NULL, NULL);
+ 
+-  g_signal_connect (self->client,
+-                    "device-added",
+-                    G_CALLBACK (device_added_cb),
+-                    self);
+-
+-  g_signal_connect (self->client,
+-                    "device-removed",
+-                    G_CALLBACK (device_removed_cb),
+-                    self);
+-
+-  g_signal_connect (self->client,
+-                    "notify::wireless-enabled",
+-                    G_CALLBACK (wireless_enabled_cb),
+-                    self);
++  g_signal_connect_object (self->client,
++                           "device-added",
++                           G_CALLBACK (device_added_cb),
++                           self, 0);
++
++  g_signal_connect_object (self->client,
++                           "device-removed",
++                           G_CALLBACK (device_removed_cb),
++                           self, 0);
++
++  g_signal_connect_object (self->client,
++                           "notify::wireless-enabled",
++                           G_CALLBACK (wireless_enabled_cb),
++                           self, 0);
+ 
+   /* Load Wi-Fi devices */
+   load_wifi_devices (self);
+-- 
+2.24.0
+

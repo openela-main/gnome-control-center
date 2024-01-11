@@ -1,0 +1,48 @@
+From 928eebadf0fd960472a83159c9888d946cd75ed2 Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Wed, 21 Apr 2021 18:54:06 +0000
+Subject: [PATCH] shell: Avoid handling map events from other windows
+
+The CcWindow tries to unset the focus when first mapping the window.
+However this pretty wide check intercepts mapping events from other
+windows than the toplevel (e.g. subsurfaces, for popovers). This
+causes the focus to move away from the popover, overriding its
+modality.
+
+Check that the event received is addressed to the CcWindow's
+GDK window before unsetting the focus, so we don't mess with popover
+focus.
+
+Fixes: https://gitlab.gnome.org/GNOME/gnome-control-center/-/issues/1327
+
+(cherry picked from commit 7196e8aaea48054dd5fe825d371aec2319960897)
+---
+ shell/cc-window.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/shell/cc-window.c b/shell/cc-window.c
+index 9144834a4..fe5ad1ee7 100644
+--- a/shell/cc-window.c
++++ b/shell/cc-window.c
+@@ -458,10 +458,14 @@ window_map_event_cb (GtkWidget *widget,
+                      GdkEvent  *event,
+                      CcWindow  *self)
+ {
+-  /* If focus ends up in a category icon view one of the items is
+-   * immediately selected which looks odd when we are starting up, so
+-   * we explicitly unset the focus here. */
+-  gtk_window_set_focus (GTK_WINDOW (self), NULL);
++  if (event->any.window == gtk_widget_get_window (GTK_WIDGET (self)))
++    {
++      /* If focus ends up in a category icon view one of the items is
++       * immediately selected which looks odd when we are starting up, so
++       * we  explicitly unset the focus here. */
++      gtk_window_set_focus (GTK_WINDOW (self), NULL);
++    }
++
+   return GDK_EVENT_PROPAGATE;
+ }
+ 
+-- 
+2.37.1
+

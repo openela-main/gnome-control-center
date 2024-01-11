@@ -1,0 +1,41 @@
+From 07410fb2f8ecf1dd8bb82bf29a7e81304f62aa81 Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Mon, 30 Jul 2018 21:10:31 +0200
+Subject: [PATCH] wacom: Update to newer "output" setting
+
+The semantics are pretty much the same for opaque tablets, not
+much else to do here.
+---
+ panels/wacom/cc-wacom-device.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/panels/wacom/cc-wacom-device.c b/panels/wacom/cc-wacom-device.c
+index 488637dec..e0915d5b5 100644
+--- a/panels/wacom/cc-wacom-device.c
++++ b/panels/wacom/cc-wacom-device.c
+@@ -309,11 +309,11 @@ find_output (GnomeRRScreen *rr_screen,
+ 	gsize n;
+ 
+ 	settings = cc_wacom_device_get_settings (device);
+-	variant = g_settings_get_value (settings, "display");
++	variant = g_settings_get_value (settings, "output");
+ 	edid = g_variant_get_strv (variant, &n);
+ 
+ 	if (n != 3) {
+-		g_critical ("Expected 'display' key to store %d values; got %"G_GSIZE_FORMAT".", 3, n);
++		g_critical ("Expected 'output' key to store %d values; got %"G_GSIZE_FORMAT".", 3, n);
+ 		goto out;
+ 	}
+ 
+@@ -378,7 +378,7 @@ cc_wacom_device_set_output (CcWacomDevice *device,
+ 		values[2] = serial;
+ 	}
+ 
+-	g_settings_set_strv (settings, "display", values);
++	g_settings_set_strv (settings, "output", values);
+ 
+ 	g_free (vendor);
+ 	g_free (product);
+-- 
+2.21.0
+
