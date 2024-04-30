@@ -69,15 +69,17 @@ index b20e5c1f7..99c8b20d7 100644
 +      gtk_widget_hide (GTK_WIDGET (self->subscription_row));
 +      return;
 +    }
-+
 +  if (!get_subscription_status (self->subscription_proxy, &status))
 +    {
 +      gtk_widget_hide (GTK_WIDGET (self->subscription_row));
 +      return;
 +    }
-+
 +  switch (status)
 +    {
++    case GSD_SUBMAN_SUBSCRIPTION_STATUS_NOT_READ:
++      gtk_widget_hide (GTK_WIDGET (self->subscription_row));
++      gtk_widget_set_sensitive (GTK_WIDGET (self->software_updates_row), FALSE);
++      return;
 +    case GSD_SUBMAN_SUBSCRIPTION_STATUS_UNKNOWN:
 +      registered = FALSE;
 +      updates = FALSE;
@@ -106,9 +108,7 @@ index b20e5c1f7..99c8b20d7 100644
 +      break;
 +    default:
 +      g_assert_not_reached ();
-+      break;
 +    }
-+
 +  if (registered)
 +    {
 +      if (updates)
@@ -311,6 +311,7 @@ index 000000000..034d64181
 +#define CC_SUBSCRIPTION_COMMON_H
 +
 +typedef enum {
++  GSD_SUBMAN_SUBSCRIPTION_STATUS_NOT_READ = -1,
 +  GSD_SUBMAN_SUBSCRIPTION_STATUS_UNKNOWN,
 +  GSD_SUBMAN_SUBSCRIPTION_STATUS_VALID,
 +  GSD_SUBMAN_SUBSCRIPTION_STATUS_INVALID,
@@ -339,7 +340,6 @@ index 000000000..034d64181
 +
 +  return TRUE;
 +}
-+
 +#endif
 diff --git a/panels/info-overview/cc-subscription-details-dialog.c b/panels/info-overview/cc-subscription-details-dialog.c
 new file mode 100644
@@ -641,6 +641,7 @@ index 000000000..15da1d911
 +      break;
 +
 +    case GSD_SUBMAN_SUBSCRIPTION_STATUS_DISABLED:
++    case GSD_SUBMAN_SUBSCRIPTION_STATUS_NOT_READ:
 +      gtk_stack_set_visible_child_name (self->status_stack, "subscription-not-needed");
 +      gtk_widget_hide (GTK_WIDGET (self->subscribe_button));
 +      break;
@@ -654,7 +655,6 @@ index 000000000..15da1d911
 +
 +  gtk_widget_set_visible (GTK_WIDGET (self->separator),
 +                          gtk_widget_get_visible (GTK_WIDGET (self->subscribe_button)));
-+
 +}
 +
 +static ProductData *

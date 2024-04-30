@@ -14,7 +14,7 @@
 
 Name:           gnome-control-center
 Version:        40.0
-Release:        29%{?dist}
+Release:        30%{?dist}
 Summary:        Utilities to configure the GNOME desktop
 
 License:        GPLv2+ and CC-BY-SA
@@ -242,6 +242,11 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gnome-control-center
 %dir %{_datadir}/gnome/wm-properties
 
 %changelog
+* Tue Jan 09 2024 Ray Strode <rstrode@redhat.com> - 40.0-30
+- Handle subscription manager service not running without
+  crashing
+  Related: RHEL-20449
+
 * Fri Feb 10 2023 Felipe Borges <feborges@redhat.com> - 40.0-29
 - Fix keyboard accessibility of screen resolution list
   Resolves: rhbz#2168686
