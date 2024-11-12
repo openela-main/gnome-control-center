@@ -14,7 +14,7 @@
 
 Name:           gnome-control-center
 Version:        40.0
-Release:        30%{?dist}
+Release:        31%{?dist}
 Summary:        Utilities to configure the GNOME desktop
 
 License:        GPLv2+ and CC-BY-SA
@@ -52,6 +52,8 @@ Patch13:        gnome-control-center-wwan-5g-support.patch
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=2168686
 Patch14:        0001-shell-Avoid-handling-map-events-from-other-windows.patch
+
+Patch15:        0001-wacom-Provide-connector-name-for-disambiguation.patch
 
 BuildRequires:  chrpath
 BuildRequires:  cups-devel
@@ -242,6 +244,10 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gnome-control-center
 %dir %{_datadir}/gnome/wm-properties
 
 %changelog
+* Fri Apr 19 2024 Carlos Garnacho <cgarnach@redhat.com> - 40.0-31
+- Provide connector name for disambiguation in Wacom display mapping
+  Resolves: RHEL-23162
+
 * Tue Jan 09 2024 Ray Strode <rstrode@redhat.com> - 40.0-30
 - Handle subscription manager service not running without
   crashing

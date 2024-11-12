@@ -1,0 +1,76 @@
+From 55ea6e7468634f97f48ceae20e3e4219e14a8320 Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Wed, 7 Feb 2024 22:30:40 +0100
+Subject: [PATCH] wacom: Provide connector name for disambiguation
+
+Provide the connector name as the fourth value in the
+tablet's output setting. With recent Mutter, this will
+allow disambiguating the mapped output if there happens
+to be multiple outputs with the same EDID data.
+---
+ panels/wacom/cc-wacom-device.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/panels/wacom/cc-wacom-device.c b/panels/wacom/cc-wacom-device.c
+index 4a3f98068..36781c9fc 100644
+--- a/panels/wacom/cc-wacom-device.c
++++ b/panels/wacom/cc-wacom-device.c
+@@ -257,7 +257,8 @@ static GnomeRROutput *
+ find_output_by_edid (GnomeRRScreen *rr_screen,
+ 		     const gchar   *vendor,
+ 		     const gchar   *product,
+-		     const gchar   *serial)
++		     const gchar   *serial,
++		     const gchar   *connector)
+ {
+ 	GnomeRROutput **rr_outputs;
+ 	GnomeRROutput *retval = NULL;
+@@ -284,8 +285,8 @@ find_output_by_edid (GnomeRRScreen *rr_screen,
+ 		        (g_strcmp0 (serial,  o_serial)  == 0);
+ 
+ 		if (match) {
+-			retval = rr_outputs[i];
+-			break;
++			if (!retval || g_strcmp0 (connector, gnome_rr_output_get_name (rr_outputs[i])) == 0)
++				retval = rr_outputs[i];
+ 		}
+ 	}
+ 
+@@ -309,7 +310,7 @@ find_output (GnomeRRScreen *rr_screen,
+ 	variant = g_settings_get_value (settings, "output");
+ 	edid = g_variant_get_strv (variant, &n);
+ 
+-	if (n != 3) {
++	if (n < 3) {
+ 		g_critical ("Expected 'output' key to store %d values; got %"G_GSIZE_FORMAT".", 3, n);
+ 		return NULL;
+ 	}
+@@ -317,7 +318,7 @@ find_output (GnomeRRScreen *rr_screen,
+ 	if (strlen (edid[0]) == 0 || strlen (edid[1]) == 0 || strlen (edid[2]) == 0)
+ 		return NULL;
+ 
+-	return find_output_by_edid (rr_screen, edid[0], edid[1], edid[2]);
++	return find_output_by_edid (rr_screen, edid[0], edid[1], edid[2], n == 4 ? edid[3] : NULL);
+ }
+ 
+ GnomeRROutput *
+@@ -353,7 +354,7 @@ cc_wacom_device_set_output (CcWacomDevice *device,
+ 	g_autofree gchar *vendor = NULL;
+ 	g_autofree gchar *product = NULL;
+ 	g_autofree gchar *serial = NULL;
+-	const gchar *values[] = { "", "", "", NULL };
++	const gchar *values[] = { "", "", "", "", NULL };
+ 
+         g_return_if_fail (CC_IS_WACOM_DEVICE (device));
+ 
+@@ -368,6 +369,7 @@ cc_wacom_device_set_output (CcWacomDevice *device,
+ 		values[0] = vendor;
+ 		values[1] = product;
+ 		values[2] = serial;
++		values[3] = gnome_rr_output_get_name (output);
+ 	}
+ 
+ 	g_settings_set_strv (settings, "output", values);
+-- 
+2.43.0
+
