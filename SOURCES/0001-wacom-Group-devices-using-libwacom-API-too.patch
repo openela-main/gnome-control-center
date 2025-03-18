@@ -1,0 +1,65 @@
+From 482c317e2bfd17297c886acd99317436926a210d Mon Sep 17 00:00:00 2001
+From: rpm-build <rpm-build>
+Date: Thu, 15 Aug 2024 02:03:23 +0200
+Subject: [PATCH] wacom: Group devices using libwacom API too
+
+---
+ panels/wacom/cc-wacom-device.c | 7 +++++++
+ panels/wacom/cc-wacom-device.h | 4 ++++
+ panels/wacom/cc-wacom-page.c   | 9 +++++----
+ 3 files changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/panels/wacom/cc-wacom-device.c b/panels/wacom/cc-wacom-device.c
+index a273393..cd3be0a 100644
+--- a/panels/wacom/cc-wacom-device.c
++++ b/panels/wacom/cc-wacom-device.c
+@@ -406,3 +406,10 @@ cc_wacom_device_get_button_settings (CcWacomDevice *device,
+ 
+ 	return settings;
+ }
++
++gboolean
++cc_wacom_device_is_grouped (CcWacomDevice *device1,
++                            CcWacomDevice *device2)
++{
++	return libwacom_compare (device1->wdevice, device2->wdevice, WCOMPARE_NORMAL) == 0;
++}
+diff --git a/panels/wacom/cc-wacom-device.h b/panels/wacom/cc-wacom-device.h
+index fae504a..18c5df0 100644
+--- a/panels/wacom/cc-wacom-device.h
++++ b/panels/wacom/cc-wacom-device.h
+@@ -61,3 +61,7 @@ guint           cc_wacom_device_get_num_buttons (CcWacomDevice *wacom_device);
+ 
+ GSettings     * cc_wacom_device_get_button_settings (CcWacomDevice *device,
+ 						     guint          button);
++
++gboolean        cc_wacom_device_is_grouped (CcWacomDevice *device1,
++                                            CcWacomDevice *device2);
++
+diff --git a/panels/wacom/cc-wacom-page.c b/panels/wacom/cc-wacom-page.c
+index b85bce7..25041c4 100644
+--- a/panels/wacom/cc-wacom-page.c
++++ b/panels/wacom/cc-wacom-page.c
+@@ -918,14 +918,15 @@ check_add_pad (CcWacomPage *page,
+ 	if ((gsd_device_get_device_type (gsd_device) & GSD_DEVICE_TYPE_PAD) == 0)
+ 		return;
+ 
+-	if (!gsd_device_shares_group (cc_wacom_device_get_device (page->stylus),
+-				      gsd_device))
+-		return;
+-
+ 	wacom_device = cc_wacom_device_new (gsd_device);
+ 	if (!wacom_device)
+ 		return;
+ 
++	if (!cc_wacom_device_is_grouped (page->stylus, wacom_device) &&
++            !gsd_device_shares_group (cc_wacom_device_get_device (page->stylus),
++                                      gsd_device))
++                return;
++
+ 	page->pads = g_list_prepend (page->pads, g_steal_pointer (&wacom_device));
+ 	update_pad_availability (page);
+ }
+-- 
+2.46.0
+

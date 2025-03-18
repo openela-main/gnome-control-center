@@ -14,7 +14,7 @@
 
 Name:           gnome-control-center
 Version:        40.0
-Release:        31%{?dist}
+Release:        32%{?dist}
 Summary:        Utilities to configure the GNOME desktop
 
 License:        GPLv2+ and CC-BY-SA
@@ -54,6 +54,8 @@ Patch13:        gnome-control-center-wwan-5g-support.patch
 Patch14:        0001-shell-Avoid-handling-map-events-from-other-windows.patch
 
 Patch15:        0001-wacom-Provide-connector-name-for-disambiguation.patch
+
+Patch16:        0001-wacom-Group-devices-using-libwacom-API-too.patch
 
 BuildRequires:  chrpath
 BuildRequires:  cups-devel
@@ -244,6 +246,10 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gnome-control-center
 %dir %{_datadir}/gnome/wm-properties
 
 %changelog
+* Fri Dec 13 2024 Carlos Garnacho <cgarnach@redhat.com> - 40.0-32
+- Look up grouped devices through libwacom API too
+  Resolves: RHEL-56634
+
 * Fri Apr 19 2024 Carlos Garnacho <cgarnach@redhat.com> - 40.0-31
 - Provide connector name for disambiguation in Wacom display mapping
   Resolves: RHEL-23162
