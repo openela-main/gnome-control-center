@@ -1,7 +1,7 @@
 %define gnome_online_accounts_version 3.25.3
 %define glib2_version 2.56.0
 %define gnome_desktop_version 3.35.4
-%define gsd_version 3.35.0
+%define gsd_version 40.0.1-19
 %define gsettings_desktop_schemas_version 3.37.1
 %define upower_version 0.99.8
 %define gtk3_version 3.22.20
@@ -14,7 +14,7 @@
 
 Name:           gnome-control-center
 Version:        40.0
-Release:        32%{?dist}
+Release:        38%{?dist}
 Summary:        Utilities to configure the GNOME desktop
 
 License:        GPLv2+ and CC-BY-SA
@@ -55,7 +55,22 @@ Patch14:        0001-shell-Avoid-handling-map-events-from-other-windows.patch
 
 Patch15:        0001-wacom-Provide-connector-name-for-disambiguation.patch
 
-Patch16:        0001-wacom-Group-devices-using-libwacom-API-too.patch
+# https://issues.redhat.com/browse/RHEL-45317
+Patch16:        background-solid-colors.patch
+
+Patch17:        0001-wacom-Group-devices-using-libwacom-API-too.patch
+
+# Needs Jira ticket
+Patch18:        power-button-action-server.patch
+
+# https://issues.redhat.com/browse/RHEL-50729
+Patch19:        network-dont-disambiguate-ethernet-device-names.patch
+
+# https://issues.redhat.com/browse/RHEL-4226
+Patch20:        keyboard-dont-force-compose-key-value.patch
+
+# https://issues.redhat.com/browse/RHEL-4196
+Patch21:        display-draw-larger-monitors-when-multiple.patch
 
 BuildRequires:  chrpath
 BuildRequires:  cups-devel
@@ -118,7 +133,7 @@ Requires: gnome-settings-daemon%{?_isa} >= 40.0.1-4
 Requires: gsettings-desktop-schemas%{?_isa} >= %{gsettings_desktop_schemas_version}
 Requires: gtk3%{?_isa} >= %{gtk3_version}
 Requires: upower%{?_isa} >= %{upower_version}
-Requires: power-profiles-daemon >= %{power_profiles_daemon_version}
+Requires: (power-profiles-daemon or tuned-ppd)
 %ifnarch s390 s390x
 Requires: gnome-bluetooth%{?_isa} >= 1:%{gnome_bluetooth_version}
 %endif
@@ -154,7 +169,7 @@ Recommends: switcheroo-control
 Requires: /usr/bin/gkbd-keyboard-display
 %if 0%{?fedora} >= 35 || 0%{?rhel} >= 9
 # For the power panel
-Recommends: power-profiles-daemon
+Recommends: tuned-ppd
 %endif
 
 # Renamed in F28
@@ -246,9 +261,33 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gnome-control-center
 %dir %{_datadir}/gnome/wm-properties
 
 %changelog
-* Fri Dec 13 2024 Carlos Garnacho <cgarnach@redhat.com> - 40.0-32
+* Thu Jan 23 2025 Felipe Borges <feborges@redhat.com> - 40.0-38
+- Scale up monitors drawing in display arrangment settings when multiple monitors
+  Related: RHEL-4196
+
+* Thu Jan 23 2025 Felipe Borges <feborges@redhat.com> - 40.0-36
+- Don't accidentally set value of compose key when loading Keyboard settings
+  Related: RHEL-4226
+
+* Thu Jan 23 2025 Felipe Borges <feborges@redhat.com> - 40.0-35
+- Don't disambiguate ethernet network devices names
+  Related: RHEL-50729
+
+* Wed Jan 22 2025 Felipe Borges <feborges@redhat.com> - 40.0-34
+- Replace power-profiles-daemon requirement with tuned-ppd
+  Resolves: RHEL-68152
+
+* Mon Jan 20 2025 Felipe Borges <feborges@redhat.com> - 40.0-34
+- Honor "power-button-action-server" side setting
+  Related: RHEL-71937
+
+* Fri Dec 13 2024 Carlos Garnacho <cgarnach@redhat.com> - 40.0-33
 - Look up grouped devices through libwacom API too
-  Resolves: RHEL-56634
+  Resolves: RHEL-17712
+
+* Fri Aug 30 2024 Felipe Borges <feborges@redhat.com> - 40.0-32
+- Reintroduce solid color wallpapers
+  Resolves: RHEL-45317
 
 * Fri Apr 19 2024 Carlos Garnacho <cgarnach@redhat.com> - 40.0-31
 - Provide connector name for disambiguation in Wacom display mapping

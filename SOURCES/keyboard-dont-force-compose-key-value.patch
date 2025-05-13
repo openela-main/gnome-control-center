@@ -1,0 +1,210 @@
+From f00c4890be8a3d7e6e8f988e3baa9491bee496e7 Mon Sep 17 00:00:00 2001
+From: Ian Douglas Scott <idscott@system76.com>
+Date: Wed, 9 Dec 2020 09:30:32 -0800
+Subject: [PATCH] keyboard: Create CcXkbModifierDialog only when used
+
+This should avoid issues where this setting is changed just by opening
+Gnome Control Center, as reported in
+https://gitlab.gnome.org/GNOME/gnome-control-center/-/issues/918
+
+This should also mean someone can tweak the settings as desired outside
+Gnome Control Center, and not have them clobbered unless they open the
+dialog in g-c-c.
+
+(cherry picked from commit edffd1b2959bb2ad1e27b441a937a73331f3ba1f)
+
+keyboard: Rename `XkbOption` and `XkbModifier` with `Cc` prefix
+
+(cherry picked from commit e224e5177a0bc1e9b4c13fb9e5bac0ff9bef8402)
+---
+ panels/keyboard/cc-keyboard-panel.c       | 21 +++++++++------------
+ panels/keyboard/cc-xkb-modifier-dialog.c  | 18 +++++++++---------
+ panels/keyboard/cc-xkb-modifier-dialog.h  |  8 ++++----
+ panels/keyboard/cc-xkb-modifier-dialog.ui |  1 -
+ 4 files changed, 22 insertions(+), 26 deletions(-)
+
+diff --git a/panels/keyboard/cc-keyboard-panel.c b/panels/keyboard/cc-keyboard-panel.c
+index 7a3fb419b..80d75a249 100644
+--- a/panels/keyboard/cc-keyboard-panel.c
++++ b/panels/keyboard/cc-keyboard-panel.c
+@@ -46,9 +46,6 @@ struct _CcKeyboardPanel
+   GtkLabel            *value_input_switch;
+   GSettings           *keybindings_settings;
+ 
+-  /* "Type Special Characters" section */
+-  CcXkbModifierDialog *alt_chars_dialog;
+-  CcXkbModifierDialog *compose_dialog;
+   GSettings           *input_source_settings;
+   GtkListBox          *special_chars_list;
+   GtkListBoxRow       *alt_chars_row;
+@@ -66,11 +63,11 @@ enum {
+   PROP_PARAMETERS
+ };
+ 
+-static const XkbModifier LV3_MODIFIER = {
++static const CcXkbModifier LV3_MODIFIER = {
+   "lv3:",
+   N_("Alternate Characters Key"),
+   N_("The alternate characters key can be used to enter additional characters. These are sometimes printed as a third-option on your keyboard."),
+-  (XkbOption[]){
++  (CcXkbOption[]){
+     { NC_("keyboard key", "Left Alt"),    "lv3:lalt_switch" },
+     { NC_("keyboard key", "Right Alt"),   "lv3:ralt_switch" },
+     { NC_("keyboard key", "Left Super"),  "lv3:lwin_switch" },
+@@ -82,13 +79,13 @@ static const XkbModifier LV3_MODIFIER = {
+   "lv3:ralt_switch",
+ };
+ 
+-static const XkbModifier COMPOSE_MODIFIER = {
++static const CcXkbModifier COMPOSE_MODIFIER = {
+   "compose:",
+   N_("Compose Key"),
+   N_("The compose key allows a wide variety of characters to be entered. To use it, press compose then a sequence of characters. "
+      " For example, compose key followed by <b>C</b> and <b>o</b> will enter <b>©</b>, "
+      "<b>a</b> followed by <b>'</b> will enter <b>á</b>."),
+-  (XkbOption[]){
++  (CcXkbOption[]){
+     { NC_("keyboard key", "Left Alt"),     "compose:lalt" },
+     { NC_("keyboard key", "Right Alt"),    "compose:ralt" },
+     { NC_("keyboard key", "Left Super"),   "compose:lwin" },
+@@ -116,17 +113,20 @@ special_chars_activated (GtkWidget       *button,
+                          GtkListBoxRow   *row,
+                          CcKeyboardPanel *self)
+ {
++  const CcXkbModifier *modifier;
+   GtkWindow *window, *dialog;
+ 
+   window = GTK_WINDOW (cc_shell_get_toplevel (cc_panel_get_shell (CC_PANEL (self))));
+ 
+   if (row == self->alt_chars_row)
+-    dialog = GTK_WINDOW (self->alt_chars_dialog);
++    modifier = &LV3_MODIFIER;
+   else if (row == self->compose_row)
+-    dialog = GTK_WINDOW (self->compose_dialog);
++    modifier = &COMPOSE_MODIFIER;
+   else
+     return;
+ 
++  dialog = GTK_WINDOW (cc_xkb_modifier_dialog_new (self->input_source_settings, modifier));
++
+   gtk_window_set_transient_for (dialog, window);
+   gtk_widget_show (GTK_WIDGET (dialog));
+ }
+@@ -289,7 +289,4 @@ cc_keyboard_panel_init (CcKeyboardPanel *self)
+                                 NULL,
+                                 (gpointer)&COMPOSE_MODIFIER,
+                                 NULL);
+-
+-  self->alt_chars_dialog = cc_xkb_modifier_dialog_new (self->input_source_settings, &LV3_MODIFIER);
+-  self->compose_dialog = cc_xkb_modifier_dialog_new (self->input_source_settings, &COMPOSE_MODIFIER);
+ }
+diff --git a/panels/keyboard/cc-xkb-modifier-dialog.c b/panels/keyboard/cc-xkb-modifier-dialog.c
+index 78ddb48ff..ae6326a96 100644
+--- a/panels/keyboard/cc-xkb-modifier-dialog.c
++++ b/panels/keyboard/cc-xkb-modifier-dialog.c
+@@ -36,7 +36,7 @@ struct _CcXkbModifierDialog
+   HdyActionRow   *switch_row;
+ 
+   GSettings      *input_source_settings;
+-  const XkbModifier *modifier;
++  const CcXkbModifier *modifier;
+   GSList         *radio_group;
+ };
+ 
+@@ -47,10 +47,10 @@ static const gchar *custom_css =
+ "    padding: 12px"
+ "}";
+ 
+-static const XkbOption*
+-get_xkb_option_from_name (const XkbModifier *modifier, const gchar* name)
++static const CcXkbOption*
++get_xkb_option_from_name (const CcXkbModifier *modifier, const gchar* name)
+ {
+-  const XkbOption *options = modifier->options;
++  const CcXkbOption *options = modifier->options;
+   int i;
+ 
+   for (i = 0; options[i].label && options[i].xkb_option; i++)
+@@ -84,7 +84,7 @@ update_active_radio (CcXkbModifierDialog *self)
+ {
+   g_auto(GStrv) options = NULL;
+   GtkRadioButton *rightalt_radio;
+-  const XkbOption *default_option;
++  const CcXkbOption *default_option;
+   guint i;
+ 
+   options = g_settings_get_strv (self->input_source_settings, "xkb-options");
+@@ -246,7 +246,7 @@ static void
+ add_radio_buttons (CcXkbModifierDialog *self)
+ {
+   GtkWidget *row, *radio_button, *label, *last_button = NULL;
+-  XkbOption *options = self->modifier->options;
++  CcXkbOption *options = self->modifier->options;
+   int i;
+ 
+   for (i = 0; options[i].label && options[i].xkb_option; i++)
+@@ -310,7 +310,7 @@ cc_xkb_modifier_dialog_init (CcXkbModifierDialog *self)
+ 
+ CcXkbModifierDialog *
+ cc_xkb_modifier_dialog_new (GSettings *input_settings,
+-                            const XkbModifier *modifier)
++                            const CcXkbModifier *modifier)
+ {
+   CcXkbModifierDialog *self;
+ 
+@@ -336,8 +336,8 @@ xcb_modifier_transform_binding_to_label (GValue   *value,
+                                          GVariant *variant,
+                                          gpointer  user_data)
+ {
+-  const XkbModifier *modifier = user_data;
+-  const XkbOption *entry = NULL;
++  const CcXkbModifier *modifier = user_data;
++  const CcXkbOption *entry = NULL;
+   const char **items;
+   guint i;
+ 
+diff --git a/panels/keyboard/cc-xkb-modifier-dialog.h b/panels/keyboard/cc-xkb-modifier-dialog.h
+index 1b2d180a4..91efbcdde 100644
+--- a/panels/keyboard/cc-xkb-modifier-dialog.h
++++ b/panels/keyboard/cc-xkb-modifier-dialog.h
+@@ -28,21 +28,21 @@ typedef struct
+ {
+   gchar *label;
+   gchar *xkb_option;
+-} XkbOption;
++} CcXkbOption;
+ 
+ typedef struct
+ {
+   gchar *prefix;
+   gchar *title;
+   gchar *description;
+-  XkbOption *options;
++  CcXkbOption *options;
+   gchar *default_option;
+-} XkbModifier;
++} CcXkbModifier;
+ 
+ #define CC_TYPE_XKB_MODIFIER_DIALOG (cc_xkb_modifier_dialog_get_type())
+ G_DECLARE_FINAL_TYPE (CcXkbModifierDialog, cc_xkb_modifier_dialog, CC, XKB_MODIFIER_DIALOG, GtkDialog)
+ 
+-CcXkbModifierDialog *cc_xkb_modifier_dialog_new (GSettings *input_settings, const XkbModifier*);
++CcXkbModifierDialog *cc_xkb_modifier_dialog_new (GSettings *input_settings, const CcXkbModifier*);
+ 
+ gboolean xcb_modifier_transform_binding_to_label (GValue*, GVariant*, gpointer);
+ 
+diff --git a/panels/keyboard/cc-xkb-modifier-dialog.ui b/panels/keyboard/cc-xkb-modifier-dialog.ui
+index 8c2cf8e87..851b92d6b 100644
+--- a/panels/keyboard/cc-xkb-modifier-dialog.ui
++++ b/panels/keyboard/cc-xkb-modifier-dialog.ui
+@@ -6,7 +6,6 @@
+     <property name="resizable">False</property>
+     <property name="default_width">500</property>
+     <property name="type_hint">dialog</property>
+-    <signal name="delete-event" handler="gtk_widget_hide_on_delete" />
+     <child internal-child="vbox">
+       <object class="GtkBox">
+         <property name="can_focus">False</property>
+-- 
+2.34.1
+

@@ -1,0 +1,54 @@
+From 59a502e833a389d310df4f1cdfb19b835e711878 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Mon, 20 Jan 2025 15:43:34 +0100
+Subject: [PATCH] power: Honor "power-button-action-server"
+
+See https://gitlab.com/redhat/centos-stream/rpms/gnome-settings-daemon/-/merge_requests/26
+---
+ panels/power/cc-power-panel.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/panels/power/cc-power-panel.c b/panels/power/cc-power-panel.c
+index 04987ff98..bb381ff70 100644
+--- a/panels/power/cc-power-panel.c
++++ b/panels/power/cc-power-panel.c
+@@ -679,13 +679,16 @@ power_button_row_changed_cb (CcPowerPanel *self)
+   gint selected_index;
+   HdyValueObject *value_object;
+   gint value;
++  gboolean is_server = g_strcmp0 (self->chassis_type, "server") == 0;
+ 
+   model = hdy_combo_row_get_model (self->power_button_row);
+   selected_index = hdy_combo_row_get_selected_index (self->power_button_row);
+   value_object = g_list_model_get_item (model, selected_index);
+   value = GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (value_object), "value"));
+ 
+-  g_settings_set_enum (self->gsd_settings, "power-button-action", value);
++  g_settings_set_enum (self->gsd_settings,
++                       is_server ? "power-button-action-server" : "power-button-action",
++                       value);
+ }
+ 
+ static void
+@@ -1501,6 +1504,8 @@ setup_general_section (CcPowerPanel *self)
+       g_strcmp0 (self->chassis_type, "tablet") != 0 &&
+       g_strcmp0 (self->chassis_type, "handset") != 0)
+     {
++      gboolean is_server = g_strcmp0 (self->chassis_type, "server") == 0;
++
+       gtk_widget_show (GTK_WIDGET (self->power_button_row));
+ 
+       g_signal_handlers_block_by_func (self->power_button_row,
+@@ -1510,7 +1515,8 @@ setup_general_section (CcPowerPanel *self)
+                                  can_suspend,
+                                  can_hibernate);
+       set_value_for_combo_row (self->power_button_row,
+-                               g_settings_get_enum (self->gsd_settings, "power-button-action"));
++                               g_settings_get_enum (self->gsd_settings,
++                               is_server ? "power-button-action-server" : "power-button-action"));
+       g_signal_handlers_unblock_by_func (self->power_button_row,
+                                          power_button_row_changed_cb,
+                                          self);
+-- 
+2.48.1
+

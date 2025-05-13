@@ -1,0 +1,69 @@
+From 46d66b310beafd7535281068a99656a789d620a5 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Fri, 30 Aug 2024 11:59:21 +0200
+Subject: [PATCH] background: Reinstate solid color backgrounds
+
+---
+ panels/background/cc-background-chooser.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/panels/background/cc-background-chooser.c b/panels/background/cc-background-chooser.c
+index 6c8f56136..4deb9d252 100644
+--- a/panels/background/cc-background-chooser.c
++++ b/panels/background/cc-background-chooser.c
+@@ -41,6 +41,7 @@ struct _CcBackgroundChooser
+   gboolean            recent_selected;
+ 
+   BgWallpapersSource *wallpapers_source;
++  BgColorsSource     *colors_source;
+   BgRecentSource     *recent_source;
+ };
+ 
+@@ -174,6 +175,8 @@ static void
+ setup_flowbox (CcBackgroundChooser *self)
+ {
+   GListStore *store;
++  GListStore *colors;
++  int i;
+ 
+   store = bg_source_get_liststore (BG_SOURCE (self->wallpapers_source));
+ 
+@@ -183,6 +186,19 @@ setup_flowbox (CcBackgroundChooser *self)
+                            self->wallpapers_source,
+                            NULL);
+ 
++  /* Manually add solid colors to the end of the wallpapers flowbox. See RHEL-45317 */
++  colors = bg_source_get_liststore (BG_SOURCE (self->colors_source));
++  for (i = 0; i < g_list_model_get_n_items (G_LIST_MODEL (colors)); i++)
++    {
++      g_autoptr(CcBackgroundItem) color = NULL;
++      GtkWidget *widget;
++
++      color = g_list_model_get_item (G_LIST_MODEL (colors), i);
++      widget = create_widget_func (color, self->colors_source);
++
++      gtk_flow_box_insert (self->flowbox, widget, -1);
++    }
++
+   store = bg_source_get_liststore (BG_SOURCE (self->recent_source));
+ 
+   gtk_flow_box_bind_model (self->recent_flowbox,
+@@ -290,6 +306,7 @@ cc_background_chooser_finalize (GObject *object)
+   CcBackgroundChooser *self = (CcBackgroundChooser *)object;
+ 
+   g_clear_object (&self->recent_source);
++  g_clear_object (&self->colors_source);
+   g_clear_object (&self->wallpapers_source);
+ 
+   G_OBJECT_CLASS (cc_background_chooser_parent_class)->finalize (object);
+@@ -326,6 +343,7 @@ cc_background_chooser_init (CcBackgroundChooser *self)
+   gtk_widget_init_template (GTK_WIDGET (self));
+ 
+   self->recent_source = bg_recent_source_new (GTK_WIDGET (self));
++  self->colors_source = bg_colors_source_new (GTK_WIDGET (self));
+   self->wallpapers_source = bg_wallpapers_source_new (GTK_WIDGET (self));
+   setup_flowbox (self);
+ }
+-- 
+2.37.1
+

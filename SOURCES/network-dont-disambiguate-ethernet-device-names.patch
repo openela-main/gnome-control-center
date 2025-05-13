@@ -1,0 +1,71 @@
+From 26ed29be848571235ad8df43dc1cd06a2d65b5d4 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Thu, 23 Jan 2025 13:14:03 +0100
+Subject: [PATCH] Don't disambiguate wired networks titles
+
+In RHEL-50729 the customer wants the ethernet device name to appear
+consistent regardless of the name of the device.
+
+What GNOME Settings upstream does is to use
+nm_device_disambiguate_names() so that it can show a simple "Wired"
+device when there's only one (usually embedded) device and still
+change the device name when there are multiple devices connected
+(corner case) to disambiguate.
+
+These changes make the Ethernet devices always appear as "Wired $IFACE",
+where $IFACE is the result of nm_device_get_iface ().
+
+See https://networkmanager.dev/docs/libnm/latest/NMDevice.html#nm-device-disambiguate-names
+
+Related: RHEL-50729
+---
+ panels/network/cc-network-panel.c | 26 ++++++++++++++++++++++++--
+ 1 file changed, 24 insertions(+), 2 deletions(-)
+
+diff --git a/panels/network/cc-network-panel.c b/panels/network/cc-network-panel.c
+index bd4e55df8..418a353c4 100644
+--- a/panels/network/cc-network-panel.c
++++ b/panels/network/cc-network-panel.c
+@@ -230,6 +230,23 @@ cc_network_panel_get_help_uri (CcPanel *self)
+ 	return "help:gnome-help/net";
+ }
+ 
++static gchar *
++get_ethernet_device_name (NMDevice *device)
++{
++        const gchar *type_name; 
++
++        switch (nm_device_get_device_type (device)) {
++            case NM_DEVICE_TYPE_ETHERNET:
++            case NM_DEVICE_TYPE_INFINIBAND:
++                type_name = _("Wired");
++                break;
++            default:
++                return NULL;
++        }
++
++        return g_strdup_printf ("%s (%s)", type_name, nm_device_get_iface (device));
++}
++
+ static void
+ panel_refresh_device_titles (CcNetworkPanel *self)
+ {
+@@ -269,8 +286,13 @@ panel_refresh_device_titles (CcNetworkPanel *self)
+         for (i = 0; i < num_devices; i++) {
+                 if (NM_IS_DEVICE_BT (nm_devices[i]))
+                         net_device_bluetooth_set_title (NET_DEVICE_BLUETOOTH (devices[i]), nm_device_bt_get_name (NM_DEVICE_BT (nm_devices[i])));
+-                else if (NET_IS_DEVICE_ETHERNET (devices[i]))
+-                        net_device_ethernet_set_title (NET_DEVICE_ETHERNET (devices[i]), titles[i]);
++                else if (NET_IS_DEVICE_ETHERNET (devices[i])) {
++                        g_autofree gchar *device_name = NULL;
++
++                        device_name = get_ethernet_device_name (net_device_ethernet_get_device (NET_DEVICE_ETHERNET (devices[i])));
++                        net_device_ethernet_set_title (NET_DEVICE_ETHERNET (devices[i]),
++                                                       device_name ? device_name : titles[i]);
++                }
+                 else if (NET_IS_DEVICE_MOBILE (devices[i]))
+                         net_device_mobile_set_title (NET_DEVICE_MOBILE (devices[i]), titles[i]);
+         }
+-- 
+2.48.1
+

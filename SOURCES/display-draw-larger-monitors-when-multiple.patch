@@ -1,0 +1,38 @@
+From ba8f7d7e3ac9d841e719d6ef3abeec4936b19295 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Thu, 23 Jan 2025 15:33:24 +0100
+Subject: [PATCH] display: Draw larger monitors in the arrangement widget when
+ multiple
+
+(cherry picked from commit d12fd83f66f51f558ebd80ef1d704cd7e2fa340d)
+---
+ panels/display/cc-display-arrangement.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/panels/display/cc-display-arrangement.c b/panels/display/cc-display-arrangement.c
+index adbbcbc28..191291e9c 100644
+--- a/panels/display/cc-display-arrangement.c
++++ b/panels/display/cc-display-arrangement.c
+@@ -440,6 +440,7 @@ cc_display_arrangement_update_matrices (CcDisplayArrangement *self)
+   GtkAllocation allocation;
+   gdouble scale, scale_h, scale_w;
+   gint x1, y1, x2, y2, max_w, max_h;
++  gint monitors = 1;
+ 
+   g_assert (self->config);
+ 
+@@ -450,8 +451,9 @@ cc_display_arrangement_update_matrices (CcDisplayArrangement *self)
+   get_bounding_box (self->config, &x1, &y1, &x2, &y2, &max_w, &max_h);
+   gtk_widget_get_allocation (GTK_WIDGET (self), &allocation);
+ 
+-  scale_h = (gdouble) (allocation.width - 2 * MARGIN_PX) / (x2 - x1 + max_w * 2 * MARGIN_MON);
+-  scale_w = (gdouble) (allocation.height - 2 * MARGIN_PX) / (y2 - y1 + max_h * 2 * MARGIN_MON);
++  monitors = cc_display_config_count_useful_monitors (self->config);
++  scale_h = (gdouble) (allocation.width - 2 * MARGIN_PX) / (x2 - x1 + max_w * 2 * MARGIN_MON/monitors);
++  scale_w = (gdouble) (allocation.height - 2 * MARGIN_PX) / (y2 - y1 + max_h * 2 * MARGIN_MON/monitors);
+ 
+   scale = MIN (scale_h, scale_w);
+ 
+-- 
+2.48.1
+
