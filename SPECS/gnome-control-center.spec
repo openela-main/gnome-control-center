@@ -14,7 +14,7 @@
 
 Name:           gnome-control-center
 Version:        40.0
-Release:        38%{?dist}
+Release:        39%{?dist}
 Summary:        Utilities to configure the GNOME desktop
 
 License:        GPLv2+ and CC-BY-SA
@@ -71,6 +71,9 @@ Patch20:        keyboard-dont-force-compose-key-value.patch
 
 # https://issues.redhat.com/browse/RHEL-4196
 Patch21:        display-draw-larger-monitors-when-multiple.patch
+
+# https://issues.redhat.com/browse/RHEL-109584
+Patch22:        power-handle-unknown-power-profile.patch
 
 BuildRequires:  chrpath
 BuildRequires:  cups-devel
@@ -261,6 +264,10 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gnome-control-center
 %dir %{_datadir}/gnome/wm-properties
 
 %changelog
+* Mon Aug 18 2025 Felipe Borges <feborges@redhat.com> - 40.0-39
+- Fix crash with non-supported tuned-ppd profiles
+  Related: RHEL-109584
+
 * Thu Jan 23 2025 Felipe Borges <feborges@redhat.com> - 40.0-38
 - Scale up monitors drawing in display arrangment settings when multiple monitors
   Related: RHEL-4196

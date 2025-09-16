@@ -1,0 +1,102 @@
+From bd96952e07a6376942576dde292fc8504420b75c Mon Sep 17 00:00:00 2001
+From: Matthijs Velsink <mvelsink@gnome.org>
+Date: Wed, 27 Nov 2024 12:51:49 +0100
+Subject: [PATCH] power: Handle "unknown" power profiles from tuned-ppd
+
+Tuned has become the new default in Fedora 41, replacing PPD. Tuned does
+offer the same DBus interface with tuned-ppd. However, because tuned
+supports much more profiles, the tuned-ppd api is slightly incompatible
+as it can return an "unknown" active profile. Some discussion here:
+https://github.com/redhat-performance/tuned/pull/669.
+
+This crashes the Power panel. Instead, let's handle this by not doing
+anything when we get that profile. This means no radio buttons will end
+up getting selected, but that's better than showing an active profile
+that isn't really active. Note that tuned-ppd currently does not
+actively announce an ActiveProfile change if the change came from tuned,
+but it might start to in the future, so
+
+We do this by adding a new enum value, outside of the range of actual
+profiles, as we don't want to handle it as a real profile anywhere. This
+also removes the manual enum counting, there's no reason for that as
+enums are guaranteed to start at 0 and increment by 1.
+
+Note that tuned-ppd currently does not actively announce an
+ActiveProfile change if the change came from tuned, but it might start
+to in the future, so also reset all radio buttons if we get an unknown
+profile, just in case someone has the Power panel open and changes the
+active profile via tuned.
+
+(cherry picked from commit 131c5591fb256050ba9a1983a9a15509e1cfbab6)
+---
+ panels/power/cc-power-panel.c       |  9 +++++++++
+ panels/power/cc-power-profile-row.c |  4 +++-
+ panels/power/cc-power-profile-row.h | 10 ++++++----
+ 3 files changed, 18 insertions(+), 5 deletions(-)
+
+diff --git a/panels/power/cc-power-panel.c b/panels/power/cc-power-panel.c
+index bb381ff70..c446db1cd 100644
+--- a/panels/power/cc-power-panel.c
++++ b/panels/power/cc-power-panel.c
+@@ -1121,6 +1121,10 @@ performance_profile_set_active (CcPowerPanel  *self,
+   CcPowerProfile profile = cc_power_profile_from_str (profile_str);
+   GtkRadioButton *button;
+ 
++  /* FIXME: We don't know what to do with unknown profiles */
++  if (profile == CC_POWER_PROFILE_UNKNOWN)
++    return;
++
+   button = cc_power_profile_row_get_radio_button (CC_POWER_PROFILE_ROW (self->power_profiles_row[profile]));
+   g_assert (button);
+   gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (button), TRUE);
+@@ -1462,6 +1466,11 @@ setup_power_profiles (CcPowerPanel *self)
+                name, variant_lookup_string (profile_variant, "Driver"));
+ 
+       profile = cc_power_profile_from_str (name);
++
++      /* FIXME: We don't know what to do with unknown profiles */
++      if (profile == CC_POWER_PROFILE_UNKNOWN)
++        continue;
++
+       row = cc_power_profile_row_new (cc_power_profile_from_str (name));
+       cc_power_profile_row_set_performance_inhibited (row, performance_inhibited);
+       g_signal_connect_object (G_OBJECT (row), "button-toggled",
+diff --git a/panels/power/cc-power-profile-row.c b/panels/power/cc-power-profile-row.c
+index f290caa10..8327b5116 100644
+--- a/panels/power/cc-power-profile-row.c
++++ b/panels/power/cc-power-profile-row.c
+@@ -212,7 +212,9 @@ cc_power_profile_from_str (const char *profile)
+   if (g_strcmp0 (profile, "performance") == 0)
+     return CC_POWER_PROFILE_PERFORMANCE;
+ 
+-  g_assert_not_reached ();
++  g_warning ("Unknown power profile: %s", profile);
++
++  return CC_POWER_PROFILE_UNKNOWN;
+ }
+ 
+ const char *
+diff --git a/panels/power/cc-power-profile-row.h b/panels/power/cc-power-profile-row.h
+index 96c12a5e4..6b9437918 100644
+--- a/panels/power/cc-power-profile-row.h
++++ b/panels/power/cc-power-profile-row.h
+@@ -30,10 +30,12 @@ G_BEGIN_DECLS
+ 
+ typedef enum
+ {
+-  CC_POWER_PROFILE_PERFORMANCE = 0,
+-  CC_POWER_PROFILE_BALANCED    = 1,
+-  CC_POWER_PROFILE_POWER_SAVER = 2,
+-  NUM_CC_POWER_PROFILES
++  CC_POWER_PROFILE_PERFORMANCE,
++  CC_POWER_PROFILE_BALANCED,
++  CC_POWER_PROFILE_POWER_SAVER,
++  NUM_CC_POWER_PROFILES,
++  /* The unknown profile is intentionally not counted as a profile. It exists to handle unsupported profiles. */
++  CC_POWER_PROFILE_UNKNOWN
+ } CcPowerProfile;
+ 
+ #define CC_TYPE_POWER_PROFILE_ROW (cc_power_profile_row_get_type())
+-- 
+2.34.1
+
