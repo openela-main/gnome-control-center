@@ -1,0 +1,1142 @@
+From 015fd59e65295e8507f7df389833a6ba443c463f Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Thu, 30 Jan 2025 13:53:29 +0100
+Subject: [PATCH] system: Add subscription manager (Registration) page
+
+https://issues.redhat.com/browse/RHEL-26117
+---
+ panels/system/cc-system-panel.c               |  19 +
+ panels/system/cc-system-panel.ui              |  13 +
+ panels/system/gnome-system-panel.desktop.in   |   2 +-
+ .../icons/scalable/actions/key-symbolic.svg   |   4 +
+ panels/system/meson.build                     |   4 +
+ panels/system/subman/cc-subman-page.c         | 629 ++++++++++++++++++
+ panels/system/subman/cc-subman-page.h         |  38 ++
+ panels/system/subman/cc-subman-page.ui        | 254 +++++++
+ .../subman/gnome-subman-panel.desktop.in      |  14 +
+ panels/system/subman/meson.build              |   9 +
+ panels/system/system.gresource.xml            |   3 +
+ 11 files changed, 988 insertions(+), 1 deletion(-)
+ create mode 100644 panels/system/icons/scalable/actions/key-symbolic.svg
+ create mode 100644 panels/system/subman/cc-subman-page.c
+ create mode 100644 panels/system/subman/cc-subman-page.h
+ create mode 100644 panels/system/subman/cc-subman-page.ui
+ create mode 100644 panels/system/subman/gnome-subman-panel.desktop.in
+ create mode 100644 panels/system/subman/meson.build
+
+diff --git a/panels/system/cc-system-panel.c b/panels/system/cc-system-panel.c
+index f28a96372..e7ff45bdf 100644
+--- a/panels/system/cc-system-panel.c
++++ b/panels/system/cc-system-panel.c
+@@ -35,6 +35,8 @@
+ #include "secure-shell/cc-secure-shell-page.h"
+ #include "users/cc-users-page.h"
+ 
++#include "subman/cc-subman-page.h"
++
+ struct _CcSystemPanel
+ {
+   CcPanel    parent_instance;
+@@ -47,6 +49,8 @@ struct _CcSystemPanel
+ 
+   CcSecureShellPage *secure_shell_dialog;
+   AdwNavigationPage *software_updates_group;
++
++  AdwActionRow *subman_row;
+ };
+ 
+ CC_PANEL_REGISTER (CcSystemPanel, cc_system_panel)
+@@ -145,6 +149,8 @@ cc_system_panel_class_init (CcSystemPanelClass *klass)
+   gtk_widget_class_bind_template_child (widget_class, CcSystemPanel, users_row);
+   gtk_widget_class_bind_template_child (widget_class, CcSystemPanel, software_updates_group);
+ 
++  gtk_widget_class_bind_template_child (widget_class, CcSystemPanel, subman_row);
++
+   gtk_widget_class_bind_template_callback (widget_class, cc_system_page_open_software_update);
+   gtk_widget_class_bind_template_callback (widget_class, on_secure_shell_row_clicked);
+ 
+@@ -161,6 +167,7 @@ static void
+ cc_system_panel_init (CcSystemPanel *self)
+ {
+   CcServiceState service_state;
++  CcSubmanPage *subman_page;
+ 
+   g_resources_register (cc_system_get_resource ());
+   gtk_widget_init_template (GTK_WIDGET (self));
+@@ -176,4 +183,16 @@ cc_system_panel_init (CcSystemPanel *self)
+   cc_panel_add_static_subpage (CC_PANEL (self), "region", CC_TYPE_REGION_PAGE);
+   cc_panel_add_static_subpage (CC_PANEL (self), "remote-desktop", CC_TYPE_REMOTE_DESKTOP_PAGE);
+   cc_panel_add_static_subpage (CC_PANEL (self), "users", CC_TYPE_USERS_PAGE);
++
++  /* Subscription Manager */
++  subman_page = g_object_new (CC_TYPE_SUBMAN_PAGE, NULL);
++  if (cc_subman_page_is_available (subman_page))
++    {
++      cc_panel_add_subpage (CC_PANEL (self), "subman", ADW_NAVIGATION_PAGE (subman_page));
++      g_object_bind_property (subman_page,
++                              "is-available",
++                              self->subman_row,
++                              "visible",
++                              G_BINDING_SYNC_CREATE | G_BINDING_DEFAULT);
++    }
+ }
+diff --git a/panels/system/cc-system-panel.ui b/panels/system/cc-system-panel.ui
+index 6de8b22e8..507c6efc3 100644
+--- a/panels/system/cc-system-panel.ui
++++ b/panels/system/cc-system-panel.ui
+@@ -70,6 +70,19 @@
+                       </object>
+                     </child>
+ 
++                    <child>
++                      <object class="CcListRow" id="subman_row">
++                        <property name="visible">False</property>
++                        <property name="title" translatable="yes">Registration</property>
++                        <property name="subtitle" translatable="yes">Enable Red Hat updates, content, and services</property>
++                        <property name="use-markup">True</property>
++                        <property name="icon-name">key-symbolic</property>
++                        <property name="show-arrow">True</property>
++                        <property name="action-name">navigation.push</property>
++                        <property name="action-target">'subman'</property>
++                      </object>
++                    </child>
++
+                     <child>
+                       <object class="CcListRow" id="about_row">
+                         <property name="title" translatable="yes">_About</property>
+diff --git a/panels/system/gnome-system-panel.desktop.in b/panels/system/gnome-system-panel.desktop.in
+index a437f8b20..45e3d9a50 100644
+--- a/panels/system/gnome-system-panel.desktop.in
++++ b/panels/system/gnome-system-panel.desktop.in
+@@ -11,4 +11,4 @@ StartupNotify=true
+ Categories=GNOME;GTK;Settings;X-GNOME-Settings-Panel;X-GNOME-DetailsSettings;
+ OnlyShowIn=GNOME;Unity;
+ # Translators: Search terms to find the System panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+-Keywords=device;system;information;details;hostname;memory;processor;version;software;operating;os;model;language;region;country;formats;numbers;units;clock;timezone;date;location;remote;desktop;rdp;vnc;ssh;
++Keywords=device;system;information;details;hostname;memory;processor;version;software;operating;os;model;language;region;country;formats;numbers;units;clock;timezone;date;location;remote;desktop;rdp;vnc;ssh;Registration;Subscription;Red Hat;Products;Updates;Registry;Account;Activation;Register;Subscribe;
+diff --git a/panels/system/icons/scalable/actions/key-symbolic.svg b/panels/system/icons/scalable/actions/key-symbolic.svg
+new file mode 100644
+index 000000000..7a5e13619
+--- /dev/null
++++ b/panels/system/icons/scalable/actions/key-symbolic.svg
+@@ -0,0 +1,4 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<svg height="16px" viewBox="0 0 16 16" width="16px" xmlns="http://www.w3.org/2000/svg">
++    <path d="m 6 1 c -2.761719 0 -5 2.238281 -5 5 s 2.238281 5 5 5 c 0.832031 -0.003906 1.652344 -0.214844 2.382812 -0.617188 l 0.617188 0.617188 v 2 h 2 v 2 h 4 v -3 l -4.308594 -4.308594 c 0.199219 -0.542968 0.304688 -1.113281 0.308594 -1.691406 c 0 -2.761719 -2.238281 -5 -5 -5 z m -1 3 c 0.550781 0 1 0.449219 1 1 s -0.449219 1 -1 1 s -1 -0.449219 -1 -1 s 0.449219 -1 1 -1 z m 0 0" fill="#2e3436"/>
++</svg>
+diff --git a/panels/system/meson.build b/panels/system/meson.build
+index bbe004837..7ff9646c3 100644
+--- a/panels/system/meson.build
++++ b/panels/system/meson.build
+@@ -58,6 +58,8 @@ sources = files(
+   'users/pw-utils.c',
+   'users/run-passwd.c',
+   'users/user-utils.c',
++
++  'subman/cc-subman-page.c',
+ )
+ 
+ sources += gnome.compile_resources(
+@@ -136,6 +138,8 @@ subdir('remote-desktop')
+ subdir('secure-shell')
+ subdir('users')
+ 
++subdir('subman')
++
+ panels_libs += static_library(
+   cappletname,
+   sources: sources,
+diff --git a/panels/system/subman/cc-subman-page.c b/panels/system/subman/cc-subman-page.c
+new file mode 100644
+index 000000000..7b29c3f72
+--- /dev/null
++++ b/panels/system/subman/cc-subman-page.c
+@@ -0,0 +1,629 @@
++/*
++ * cc-subman-page.c
++ *
++ * Copyright 2025 Red Hat Inc
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * SPDX-License-Identifier: GPL-3.0-or-later
++ *
++ * Author(s):
++ *   Felipe Borges <felipeborges@gnome.org>
++ */
++
++#undef G_LOG_DOMAIN
++#define G_LOG_DOMAIN "cc-subman-page"
++
++#ifdef HAVE_CONFIG_H
++# include "config.h"
++#endif
++
++#include "cc-subman-page.h"
++
++#include "cc-list-row.h"
++#include "cc-list-row-info-button.h"
++
++#include <locale.h>
++#include <glib/gi18n.h>
++#include <gio/gio.h>
++#include <gtk/gtk.h>
++
++#define SERVER_URL "subscription.rhsm.redhat.com"
++#define DBUS_TIMEOUT 300000 /* 5 minutes */
++
++typedef enum {
++  GSD_SUBMAN_SUBSCRIPTION_STATUS_NOT_READ = -1,
++  GSD_SUBMAN_SUBSCRIPTION_STATUS_UNKNOWN,
++  GSD_SUBMAN_SUBSCRIPTION_STATUS_VALID,
++  GSD_SUBMAN_SUBSCRIPTION_STATUS_INVALID,
++  GSD_SUBMAN_SUBSCRIPTION_STATUS_DISABLED,
++  GSD_SUBMAN_SUBSCRIPTION_STATUS_PARTIALLY_VALID,
++  GSD_SUBMAN_SUBSCRIPTION_STATUS_NO_INSTALLED_PRODUCTS,
++  GSD_SUBMAN_SUBSCRIPTION_STATUS_LAST
++} GsdSubmanSubscriptionStatus;
++
++struct _CcSubmanPage {
++    AdwNavigationPage    parent_instance;
++
++    AdwNavigationView   *navigation;
++
++    GtkStack            *registration_page_stack;
++    GtkWidget           *register_button;
++
++    GtkCheckButton      *username_method;
++    AdwEntryRow         *server_row;
++
++    AdwEntryRow         *username_row;
++    AdwPasswordEntryRow *password_row;
++    AdwEntryRow         *activation_keys_row;
++    AdwEntryRow         *organization_row;
++    CcListRowInfoButton *organization_info_text;
++
++    AdwPreferencesGroup *products_group;
++
++    /* Backend */
++    GDBusProxy *proxy;
++    gboolean is_registered;
++    gboolean is_available;
++
++    GPtrArray          *products;
++
++    GCancellable *cancellable;
++};
++
++enum {
++    PROP_0,
++    PROP_IS_AVAILABLE,
++    PROP_IS_REGISTERED,
++    N_PROPERTIES
++};
++
++static GParamSpec *properties[N_PROPERTIES] = { NULL };
++
++G_DEFINE_TYPE (CcSubmanPage, cc_subman_page, ADW_TYPE_NAVIGATION_PAGE)
++
++typedef struct
++{
++    gchar *product_name;
++    gchar *product_id;
++    gchar *version;
++    gchar *arch;
++    gchar *starts;
++    gchar *ends;
++} ProductData;
++
++static void
++product_data_free (ProductData *product)
++{
++    g_free (product->product_name);
++    g_free (product->product_id);
++    g_free (product->version);
++    g_free (product->arch);
++    g_free (product->starts);
++    g_free (product->ends);
++    g_free (product);
++}
++G_DEFINE_AUTOPTR_CLEANUP_FUNC (ProductData, product_data_free);
++
++static void get_subscription_status (CcSubmanPage *self);
++
++static void
++show_error (CcSubmanPage *self,
++            const gchar  *message,
++            const gchar  *description)
++{
++    AdwDialog *dialog = adw_alert_dialog_new (message, description);
++
++    adw_alert_dialog_add_responses (ADW_ALERT_DIALOG (dialog),
++                                    "close", _("Close"), NULL);
++
++    adw_alert_dialog_set_default_response (ADW_ALERT_DIALOG (dialog), "close");
++    adw_alert_dialog_set_close_response (ADW_ALERT_DIALOG (dialog), "close");
++
++    g_signal_connect (dialog, "response", G_CALLBACK (adw_dialog_close), NULL);
++
++    adw_dialog_present (dialog, GTK_WIDGET (self));
++}
++
++static void
++unregistration_done_cb (GObject      *source_object,
++                        GAsyncResult *result,
++                        gpointer      user_data)
++{
++    CcSubmanPage *self = CC_SUBMAN_PAGE (user_data);
++    g_autoptr(GVariant) variant_results = NULL;
++    g_autoptr(GError) error = NULL;
++
++    gtk_widget_set_sensitive (GTK_WIDGET (self), TRUE);
++
++    variant_results = g_dbus_proxy_call_finish (G_DBUS_PROXY (source_object), result, &error);
++    if (variant_results == NULL) {
++        if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
++            return;
++
++        g_dbus_error_strip_remote_error (error);
++        show_error (self, _("Failed to Unregister System"), error->message);
++        return;
++    }
++
++    g_object_set (self, "is-registered", FALSE, NULL);
++    g_debug ("System is no longer registered");
++}
++
++static void
++on_unregister_response_cb (AdwAlertDialog *dialog,
++                           GAsyncResult   *result,
++                           CcSubmanPage   *self)
++{
++    const gchar *response = adw_alert_dialog_choose_finish (dialog, result);
++
++    if (g_strcmp0 (response, "unregister") == 0) {
++        g_dbus_proxy_call (self->proxy,
++                           "Unregister",
++                           NULL,
++                           G_DBUS_CALL_FLAGS_NONE,
++                           DBUS_TIMEOUT,
++                           self->cancellable,
++                           unregistration_done_cb,
++                           self);
++    } else {
++        gtk_widget_set_sensitive (GTK_WIDGET (self), TRUE);
++    }
++}
++
++static void
++unregister (CcSubmanPage *self)
++{
++    AdwDialog *dialog = adw_alert_dialog_new (_("Remove Registration?"),
++                                              _("Subscriptions will be removed and the device will no longer receive software updates"));
++    adw_alert_dialog_add_responses (ADW_ALERT_DIALOG (dialog),
++                                    "cancel", _("Cancel"),
++                                    "unregister", _("Remove Registration"), NULL);
++    adw_alert_dialog_set_response_appearance (ADW_ALERT_DIALOG (dialog),
++                                          "unregister",
++                                          ADW_RESPONSE_DESTRUCTIVE);
++    adw_alert_dialog_set_default_response (ADW_ALERT_DIALOG (dialog), "cancel");
++    adw_alert_dialog_set_close_response (ADW_ALERT_DIALOG (dialog), "cancel");
++
++    gtk_widget_set_sensitive (GTK_WIDGET (self), FALSE);
++
++    adw_alert_dialog_choose (ADW_ALERT_DIALOG (dialog),
++                             GTK_WIDGET (self),
++                             self->cancellable,
++                             (GAsyncReadyCallback) on_unregister_response_cb,
++                             self);
++}
++
++static void
++add_product_row (GtkWidget   *expander,
++                 const gchar *title,
++                 const gchar *value)
++{
++    CcListRow *row = g_object_new (CC_TYPE_LIST_ROW, NULL);
++
++    adw_preferences_row_set_title (ADW_PREFERENCES_ROW (row), title);
++    cc_list_row_set_secondary_label (row, value);
++
++    adw_expander_row_add_row (ADW_EXPANDER_ROW (expander), GTK_WIDGET (row));
++}
++
++static void
++add_product (CcSubmanPage *self,
++             ProductData  *product)
++{
++    GtkWidget *product_row;
++
++    product_row = adw_expander_row_new ();
++    adw_preferences_row_set_title (ADW_PREFERENCES_ROW (product_row), product->product_name);
++
++    add_product_row (product_row, _("Product ID"), product->product_id);
++    add_product_row (product_row, _("Version"), product->version);
++    add_product_row (product_row, _("Arch"), product->arch);
++
++    if (product->starts[0] != '\0' && product->ends[0] != '\0') {
++        add_product_row (product_row, _("Starts"), product->starts);
++        add_product_row (product_row, _("Ends"), product->ends);
++    }
++
++    adw_preferences_group_add (self->products_group, product_row);
++}
++
++static ProductData *
++parse_product_variant (GVariant *product_variant)
++{
++    ProductData *product = g_new0 (ProductData, 1);
++    g_auto(GVariantDict) dict;
++
++    g_variant_dict_init (&dict, product_variant);
++
++    g_variant_dict_lookup (&dict, "product-name", "s", &product->product_name);
++    g_variant_dict_lookup (&dict, "product-id", "s", &product->product_id);
++    g_variant_dict_lookup (&dict, "version", "s", &product->version);
++    g_variant_dict_lookup (&dict, "arch", "s", &product->arch);
++    g_variant_dict_lookup (&dict, "starts", "s", &product->starts);
++    g_variant_dict_lookup (&dict, "ends", "s", &product->ends);
++
++    return g_steal_pointer (&product);
++}
++
++static void
++fetch_installed_products (CcSubmanPage *self)
++{
++    g_autoptr(GVariant) installed_products_variant = NULL;
++    GVariantIter iter_array;
++    GVariant *child;
++
++    installed_products_variant = g_dbus_proxy_get_cached_property (self->proxy, "InstalledProducts");
++    if (installed_products_variant == NULL) {
++        g_debug ("Unable to get 'InstalledProducts' DBus property");
++        return;
++    }
++
++    g_ptr_array_set_size (self->products, 0);
++
++    g_variant_iter_init (&iter_array, installed_products_variant);
++    while ((child = g_variant_iter_next_value (&iter_array)) != NULL) {
++        g_autoptr(GVariant) product_variant = g_steal_pointer (&child);
++        g_ptr_array_add (self->products, parse_product_variant (product_variant));
++    }
++
++    if (self->products == NULL || self->products->len == 0) {
++        // Show a no-products page?
++    }
++
++    for (guint i = 0; i < self->products->len; i++) {
++        ProductData *product = g_ptr_array_index (self->products, i);
++
++        add_product (self, product);
++    }
++}
++
++static void
++registration_done_cb (GObject      *source_object,
++                      GAsyncResult *result,
++                      gpointer      user_data)
++{
++    CcSubmanPage *self = CC_SUBMAN_PAGE (user_data);
++    g_autoptr(GVariant) results = NULL;
++    g_autoptr(GError) error = NULL;
++
++    gtk_widget_set_sensitive (GTK_WIDGET (self), TRUE);
++
++    results = g_dbus_proxy_call_finish (G_DBUS_PROXY (source_object), result, &error);
++    if (results == NULL) {
++        if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
++            return;
++
++        g_dbus_error_strip_remote_error (error);
++
++        show_error (self, _("Failed to Register System"), error->message);
++
++        g_warning ("Failed to register: %s", error->message);
++        return;
++    }
++
++    g_debug ("Registration successful");
++    get_subscription_status (self);
++}
++
++static void
++update_register_button (CcSubmanPage *self)
++{
++    gboolean is_registering = !gtk_widget_get_sensitive (GTK_WIDGET (self));
++
++    gtk_widget_set_visible (self->register_button, !is_registering);
++}
++
++static void
++register_subscription (CcSubmanPage *self)
++{
++    gboolean register_with_username = gtk_check_button_get_active (self->username_method);
++    g_autoptr(GVariantBuilder) options_builder = NULL;
++    const gchar *hostname;
++    const gchar *organization;
++    const gchar *username;
++    const gchar *password;
++    const gchar *activation_keys;
++
++    gtk_widget_set_sensitive (GTK_WIDGET (self), FALSE);
++
++    hostname =  gtk_editable_get_text (GTK_EDITABLE (self->server_row));
++    organization = gtk_editable_get_text (GTK_EDITABLE (self->organization_row));
++
++    if (register_with_username) {
++        username = gtk_editable_get_text (GTK_EDITABLE (self->username_row));
++        password = gtk_editable_get_text (GTK_EDITABLE (self->password_row));
++    } else {
++        activation_keys = gtk_editable_get_text (GTK_EDITABLE (self->activation_keys_row));
++    }
++
++    options_builder = g_variant_builder_new (G_VARIANT_TYPE ("a{sv}"));
++    g_variant_builder_add (options_builder, "{sv}", "hostname", g_variant_new_string (hostname));
++    g_variant_builder_add (options_builder, "{sv}", "organisation", g_variant_new_string (organization));
++    if (register_with_username) {
++        g_variant_builder_add (options_builder, "{sv}", "kind", g_variant_new_string ("username"));
++        g_variant_builder_add (options_builder, "{sv}", "username", g_variant_new_string (username));
++        g_variant_builder_add (options_builder, "{sv}", "password", g_variant_new_string (password));
++    } else {
++        g_variant_builder_add (options_builder, "{sv}", "kind", g_variant_new_string ("key"));
++        g_variant_builder_add (options_builder, "{sv}", "activation-key", g_variant_new_string (activation_keys));
++    }
++
++    g_dbus_proxy_call (self->proxy,
++                       "Register",
++                       g_variant_new ("(a{sv})", options_builder),
++                       G_DBUS_CALL_FLAGS_NONE,
++                       DBUS_TIMEOUT,
++                       self->cancellable,
++                       registration_done_cb,
++                       self);
++}
++
++static void
++update_for_status (CcSubmanPage *self,
++                   GsdSubmanSubscriptionStatus status)
++{
++    switch (status) {
++        case GSD_SUBMAN_SUBSCRIPTION_STATUS_NOT_READ:
++            g_object_set (G_OBJECT (self), "is-registered", FALSE, NULL);
++            break;// Why return?;
++        case GSD_SUBMAN_SUBSCRIPTION_STATUS_UNKNOWN:
++            g_object_set (G_OBJECT (self), "is-registered", FALSE, NULL);
++            break;
++        case GSD_SUBMAN_SUBSCRIPTION_STATUS_DISABLED:
++            g_object_set (G_OBJECT (self), "is-registered", TRUE, NULL);
++            break;
++        case GSD_SUBMAN_SUBSCRIPTION_STATUS_VALID:
++        case GSD_SUBMAN_SUBSCRIPTION_STATUS_PARTIALLY_VALID:
++            g_object_set (G_OBJECT (self), "is-registered", TRUE, NULL);
++            break;
++        case GSD_SUBMAN_SUBSCRIPTION_STATUS_INVALID:
++            g_object_set (G_OBJECT (self), "is-registered", TRUE, NULL);
++            break;
++        case GSD_SUBMAN_SUBSCRIPTION_STATUS_NO_INSTALLED_PRODUCTS:
++            g_object_set (G_OBJECT (self), "is-registered", FALSE, NULL);
++            break;
++        default:
++            g_assert_not_reached ();
++    }
++}
++
++static void
++get_subscription_status (CcSubmanPage *self)
++{
++    g_autoptr(GVariant) status_variant = NULL;
++    g_autoptr(GError) error = NULL;
++    guint32 u;
++
++    if (self->proxy == NULL) {
++        self->proxy = g_dbus_proxy_new_for_bus_sync (G_BUS_TYPE_SESSION,
++                                                     G_DBUS_PROXY_FLAGS_NONE,
++                                                     NULL,
++                                                     "org.gnome.SettingsDaemon.Subscription",
++                                                     "/org/gnome/SettingsDaemon/Subscription",
++                                                     "org.gnome.SettingsDaemon.Subscription",
++                                                     NULL, &error);
++        if (error != NULL) {
++            g_debug ("Unable to create proxy for org.gnome.SettingsDaemon.Subscription: %s", error->message);
++
++            self->is_available = FALSE;
++            return;
++        }
++
++        g_signal_connect_swapped (self->proxy, "g-properties-changed",
++                                  G_CALLBACK (get_subscription_status), self);
++    }
++
++    status_variant = g_dbus_proxy_get_cached_property (self->proxy, "SubscriptionStatus");
++    if (!status_variant) {
++        g_debug ("Unable to get SubscriptionStatus property");
++
++        self->is_available = FALSE;
++        return;
++    }
++
++    g_debug ("Subscription manager is available");
++    self->is_available = TRUE;
++
++    g_variant_get (status_variant, "u", &u);
++    update_for_status (self, u);
++}
++
++static void
++validate_registration_details (CcSubmanPage *self)
++{
++    gboolean username_auth = gtk_check_button_get_active (self->username_method);
++    const gchar *server_url = gtk_editable_get_text (GTK_EDITABLE (self->server_row));
++    gboolean can_register = FALSE;
++
++    can_register = (g_strcmp0 (server_url, "") != 0);
++    if (username_auth) {
++        const gchar *username = gtk_editable_get_text (GTK_EDITABLE (self->username_row));
++        const gchar *password = gtk_editable_get_text (GTK_EDITABLE (self->password_row));
++
++        can_register = can_register && (g_strcmp0 (username, "") != 0) && (g_strcmp0 (password, "") != 0);
++    } else {
++        const gchar *activation_keys = gtk_editable_get_text (GTK_EDITABLE (self->activation_keys_row));
++        const gchar *organization = gtk_editable_get_text (GTK_EDITABLE (self->organization_row));
++
++        can_register = can_register && (g_strcmp0 (activation_keys, "") != 0) && (g_strcmp0 (organization, "") != 0);
++    }
++
++    gtk_widget_set_sensitive (self->register_button, can_register);
++}
++
++static void
++on_is_registered_changed (CcSubmanPage *self)
++{
++    adw_navigation_view_replace (self->navigation, NULL, 0);
++    adw_navigation_view_push_by_tag (self->navigation,
++        self->is_registered ? "products-page" : "registration-page");
++}
++
++static void
++update_organization_info_text (CcSubmanPage *self)
++{
++    gboolean username_auth = gtk_check_button_get_active (self->username_method);
++
++    cc_list_row_info_button_set_text (self->organization_info_text,
++        username_auth ? _("If the user account belongs to multiple organizations, an organization must be specified.") :
++                        _("Organization must be specified when registering with an activation key."));
++}
++
++static void
++reset_server_row_button_clicked_cb (CcSubmanPage *self)
++{
++    gtk_editable_set_text (GTK_EDITABLE (self->server_row), SERVER_URL);
++}
++
++static void
++on_register_system_button_clicked_cb (CcSubmanPage *self)
++{
++    gtk_stack_set_visible_child_name (self->registration_page_stack, "registration");
++}
++
++static void
++cc_subman_page_set_property (GObject      *object,
++                             guint         prop_id,
++                             const GValue *value,
++                             GParamSpec   *pspec)
++{
++    CcSubmanPage *self = CC_SUBMAN_PAGE (object);
++
++    switch (prop_id) {
++       case PROP_IS_REGISTERED:
++           self->is_registered = g_value_get_boolean (value);
++           break;
++        default:
++            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
++            break;
++    }
++}
++
++static void
++cc_subman_page_get_property (GObject    *object,
++                             guint       prop_id,
++                             GValue     *value,
++                             GParamSpec *pspec)
++{
++    CcSubmanPage *self = CC_SUBMAN_PAGE (object);
++
++    switch (prop_id) {
++        case PROP_IS_AVAILABLE:
++            g_value_set_boolean (value, self->is_available);
++            break;
++        case PROP_IS_REGISTERED:
++            g_value_set_boolean (value, self->is_registered);
++            break;
++        default:
++            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
++            break;
++    }
++}
++
++static void
++cc_subman_page_dispose (GObject *object)
++{
++    CcSubmanPage *self = CC_SUBMAN_PAGE (object);
++
++    g_cancellable_cancel (self->cancellable);
++    g_clear_object (&self->cancellable);
++
++    g_clear_object (&self->proxy);
++
++    G_OBJECT_CLASS (cc_subman_page_parent_class)->dispose (object);
++}
++
++static void
++cc_subman_page_init (CcSubmanPage *self)
++{
++    gtk_widget_init_template (GTK_WIDGET (self));
++
++    gtk_editable_set_text (GTK_EDITABLE (self->server_row), SERVER_URL);
++    update_organization_info_text (self);
++    self->products = g_ptr_array_new_with_free_func ((GDestroyNotify) product_data_free);
++
++    g_signal_connect_swapped (G_OBJECT (self),
++                              "notify::is-registered",
++                              G_CALLBACK (on_is_registered_changed),
++                              self);
++
++    self->cancellable = g_cancellable_new ();
++}
++
++static void
++cc_subman_page_class_init (CcSubmanPageClass * klass)
++{
++    GtkWidgetClass *widget_class = GTK_WIDGET_CLASS (klass);
++    GObjectClass *object_class = G_OBJECT_CLASS (klass);
++
++    object_class->set_property = cc_subman_page_set_property;
++    object_class->get_property = cc_subman_page_get_property;
++    object_class->finalize = cc_subman_page_dispose;
++
++    properties[PROP_IS_AVAILABLE] =
++        g_param_spec_boolean ("is-available",
++                             "Subscription Manager is available",
++                             "Whether Subscription Manager service is available in the system.",
++                             FALSE,
++                             G_PARAM_READABLE);
++    properties[PROP_IS_REGISTERED] =
++        g_param_spec_boolean ("is-registered",
++                             "System is registered",
++                             "The system is registered with subscription manager",
++                             FALSE,
++                             G_PARAM_READWRITE);
++
++    g_object_class_install_properties (object_class, N_PROPERTIES, properties);
++
++    g_type_ensure (CC_TYPE_LIST_ROW);
++    g_type_ensure (CC_TYPE_LIST_ROW_INFO_BUTTON);
++
++    gtk_widget_class_set_template_from_resource (widget_class, "/org/gnome/control-center/system/subman/cc-subman-page.ui");
++
++    gtk_widget_class_bind_template_child (widget_class, CcSubmanPage, navigation);
++
++    gtk_widget_class_bind_template_child (widget_class, CcSubmanPage, username_method);
++
++    gtk_widget_class_bind_template_child (widget_class, CcSubmanPage, server_row);
++    gtk_widget_class_bind_template_child (widget_class, CcSubmanPage, organization_row);
++    gtk_widget_class_bind_template_child (widget_class, CcSubmanPage, organization_info_text);
++
++    gtk_widget_class_bind_template_child (widget_class, CcSubmanPage, username_row);
++    gtk_widget_class_bind_template_child (widget_class, CcSubmanPage, password_row);
++    gtk_widget_class_bind_template_child (widget_class, CcSubmanPage, activation_keys_row);
++
++    gtk_widget_class_bind_template_child (widget_class, CcSubmanPage, register_button);
++
++    gtk_widget_class_bind_template_child (widget_class, CcSubmanPage, registration_page_stack);
++    gtk_widget_class_bind_template_child (widget_class, CcSubmanPage, products_group);
++
++    gtk_widget_class_bind_template_callback (widget_class, validate_registration_details);
++    gtk_widget_class_bind_template_callback (widget_class, register_subscription);
++    gtk_widget_class_bind_template_callback (widget_class, unregister);
++    gtk_widget_class_bind_template_callback (widget_class, reset_server_row_button_clicked_cb);
++    gtk_widget_class_bind_template_callback (widget_class, update_organization_info_text);
++    gtk_widget_class_bind_template_callback (widget_class, update_register_button);
++    gtk_widget_class_bind_template_callback (widget_class, on_register_system_button_clicked_cb);
++}
++
++gboolean
++cc_subman_page_is_available (CcSubmanPage *self)
++{
++    get_subscription_status (self);
++
++    fetch_installed_products (self);
++
++    return self->is_available;
++}
+diff --git a/panels/system/subman/cc-subman-page.h b/panels/system/subman/cc-subman-page.h
+new file mode 100644
+index 000000000..875b1e57a
+--- /dev/null
++++ b/panels/system/subman/cc-subman-page.h
+@@ -0,0 +1,38 @@
++/*
++ * cc-subman-page.h
++ *
++ * Copyright 2025 Red Hat Inc
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * SPDX-License-Identifier: GPL-3.0-or-later
++ *
++ * Author(s):
++ *  Felipe Borges <felipeborges@gnome.org>
++ */
++
++#pragma once
++
++#include <adwaita.h>
++
++G_BEGIN_DECLS
++
++#define CC_TYPE_SUBMAN_PAGE (cc_subman_page_get_type ())
++
++G_DECLARE_FINAL_TYPE (CcSubmanPage, cc_subman_page, CC, SUBMAN_PAGE, AdwNavigationPage)
++
++gboolean cc_subman_page_is_available (CcSubmanPage *self);
++
++G_END_DECLS
++
+diff --git a/panels/system/subman/cc-subman-page.ui b/panels/system/subman/cc-subman-page.ui
+new file mode 100644
+index 000000000..025f23172
+--- /dev/null
++++ b/panels/system/subman/cc-subman-page.ui
+@@ -0,0 +1,254 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<interface>
++  <template class="CcSubmanPage" parent="AdwNavigationPage">
++    <property name="tag">subman</property>
++    <signal name="notify::sensitive" handler="update_register_button" swapped="yes"/>
++    <property name="child">
++      <object class="AdwNavigationView" id="navigation">
++        <child>
++          <object class="AdwNavigationPage">
++            <property name="tag">loading-page</property>
++            <property name="child">
++              <object class="AdwToolbarView">
++                <child type="top">
++                  <object class="AdwHeaderBar"/>
++                </child>
++                <property name="content">
++                  <object class="AdwSpinner"/>
++                </property>
++              </object>
++            </property>
++          </object>
++       </child>
++       <child>
++          <object class="AdwNavigationPage">
++            <property name="tag">registration-page</property>
++            <property name="title" translatable="yes">Register System</property>
++            <property name="child">
++              <object class="AdwToolbarView">
++                <child type="top">
++                  <object class="AdwHeaderBar"/>
++                </child>
++                <property name="content">
++                  <object class="GtkStack" id="registration_page_stack">
++                    <child>
++                      <object class="GtkStackPage">
++                        <property name="name">status-page</property>
++                        <property name="child">
++                          <object class="AdwStatusPage">
++                            <property name="icon-name">key-symbolic</property>
++                            <property name="title" translatable="yes">System Not Registered</property>
++                            <property name="description" translatable="yes">Register to receive software updates, content, and services from Red Hat. No cost registrations are available as part of the Red Hat Developer program.</property>
++                            <child>
++                              <object class="GtkButton">
++                                <property name="halign">center</property>
++                                <property name="label" translatable="yes">Register System…</property>
++                                <signal name="clicked" handler="on_register_system_button_clicked_cb" swapped="yes"/>
++                              </object>
++                            </child>
++                          </object>
++                        </property>
++                      </object>
++                    </child>
++
++                    <child>
++                      <object class="GtkStackPage">
++                        <property name="name">registration</property>
++                        <property name="child">
++                          <object class="AdwPreferencesPage">
++
++                            <child>
++                              <object class="AdwPreferencesGroup">
++                                <property name="title" translatable="yes">Registration Method</property>
++                                <child>
++                                  <object class="AdwActionRow">
++                                    <property name="title" translatable="yes">Username and password</property>
++                                    <property name="activatable-widget">username_method</property>
++                                    <child type="prefix">
++                                      <object class="GtkCheckButton" id="username_method">
++                                        <property name="active">True</property>
++                                        <signal name="notify::active" handler="update_organization_info_text" swapped="yes"/>
++                                        <signal name="notify::active" handler="validate_registration_details" swapped="yes"/>
++                                      </object>
++                                    </child>
++                                  </object>
++                                </child>
++                                <child>
++                                  <object class="AdwActionRow">
++                                    <property name="title" translatable="yes">Activation Key(s)</property>
++                                    <property name="activatable-widget">activation_keys_method</property>
++                                    <child type="prefix">
++                                      <object class="GtkCheckButton" id="activation_keys_method">
++                                        <property name="group">username_method</property>
++                                        <signal name="notify::active" handler="update_organization_info_text" swapped="yes"/>
++                                        <signal name="notify::active" handler="validate_registration_details" swapped="yes"/>
++                                      </object>
++                                    </child>
++                                  </object>
++                                </child>
++                              </object>
++                            </child>
++
++                            <child>
++                              <object class="AdwPreferencesGroup">
++                                <property name="title" translatable="yes">Registration Details</property>
++                                <child>
++                                  <object class="AdwEntryRow" id="server_row">
++                                    <property name="title" translatable="yes">Registration Server</property>
++                                    <signal name="notify::text" handler="validate_registration_details" swapped="yes"/>
++                                    <child type="suffix">
++                                      <object class="GtkButton">
++                                        <property name="icon-name">view-refresh-symbolic</property>
++                                        <property name="valign">center</property>
++                                        <signal name="clicked" handler="reset_server_row_button_clicked_cb" swapped="yes"/>
++                                        <style>
++                                          <class name="flat"/>
++                                        </style>
++                                      </object>
++                                    </child>
++                                  </object>
++                                </child>
++                                <child>
++                                  <object class="AdwEntryRow" id="organization_row">
++                                    <property name="title" translatable="yes">Organization</property>
++                                    <signal name="notify::text" handler="validate_registration_details" swapped="yes"/>
++                                    <child type="suffix">
++                                      <object class="CcListRowInfoButton" id="organization_info_text">
++                                        <property name="valign">center</property>
++                                      </object>
++                                    </child>
++                                  </object>
++                                </child>
++                              </object>
++                            </child>
++
++                            <child>
++                              <object class="AdwPreferencesGroup">
++                                <child>
++                                  <object class="AdwEntryRow" id="username_row">
++                                    <property name="title" translatable="yes">Username</property>
++                                    <property name="visible" bind-source="username_method" bind-property="active" bind-flags="default|sync-create"/>
++                                    <signal name="notify::text" handler="validate_registration_details" swapped="yes"/>
++                                  </object>
++                                </child>
++                                <child>
++                                  <object class="AdwPasswordEntryRow" id="password_row">
++                                    <property name="title" translatable="yes">Password</property>
++                                    <property name="visible" bind-source="username_method" bind-property="active" bind-flags="default|sync-create"/>
++                                    <signal name="notify::text" handler="validate_registration_details" swapped="yes"/>
++                                  </object>
++                                </child>
++                                <child>
++                                  <object class="AdwEntryRow" id="activation_keys_row">
++                                    <property name="title" translatable="yes">Activation Key(s)</property>
++                                    <property name="visible" bind-source="activation_keys_method" bind-property="active" bind-flags="default|sync-create"/>
++                                    <signal name="notify::text" handler="validate_registration_details" swapped="yes"/>
++                                    <child type="suffix">
++                                      <object class="CcListRowInfoButton">
++                                        <property name="text" translatable="yes">To provide multiple activation keys, separate them with commas. If keys conflict, the rightmost key takes precedence.</property>
++                                        <property name="valign">center</property>
++                                      </object>
++                                    </child>
++                                  </object>
++                                </child>
++                              </object>
++                            </child>
++
++                            <child>
++                              <object class="AdwPreferencesGroup">
++                                <child>
++                                  <object class="AdwButtonRow" id="register_button">
++                                    <property name="sensitive">False</property>
++                                    <property name="title" translatable="yes">Register</property>
++                                    <signal name="activated" handler="register_subscription" swapped="yes"/>
++                                    <style>
++                                      <class name="suggested-action"/>
++                                    </style>
++                                  </object>
++                                </child>
++                                <child>
++                                  <object class="AdwButtonRow" id="registering_button">
++                                    <property name="visible" bind-source="register_button" bind-property="visible" bind-flags="sync-create|invert-boolean"/>
++                                    <property name="sensitive">False</property>
++                                    <signal name="activated" handler="register_subscription" swapped="yes"/>
++                                    <child>
++                                      <object class="GtkBox">
++                                        <property name="halign">center</property>
++                                        <child>
++                                          <object class="AdwSpinner"/>
++                                        </child>
++                                        <child>
++                                          <object class="GtkLabel">
++                                            <property name="label" translatable="yes">Registering</property>
++                                            <style>
++                                              <class name="title"/>
++                                            </style>
++                                          </object>
++                                        </child>
++                                      </object>
++                                    </child>
++                                  </object>
++                                </child>
++                              </object>
++                            </child>
++
++                          </object>
++                        </property>
++                      </object>
++                    </child>
++                  </object>
++                </property>
++              </object>
++            </property>
++          </object>
++        </child>
++
++        <child>
++          <object class="AdwNavigationPage">
++            <property name="tag">products-page</property>
++            <property name="title" translatable="yes">Registration</property>
++            <property name="child">
++              <object class="AdwToolbarView">
++                <child type="top">
++                  <object class="AdwHeaderBar"/>
++                </child>
++                <property name="content">
++                  <object class="AdwPreferencesPage">
++                    <child>
++                      <object class="AdwPreferencesGroup">
++                        <child>
++                          <object class="AdwActionRow" id="registration_status_row">
++                            <property name="title" translatable="yes">Registration Status</property>
++                            <property name="subtitle" translatable="yes">Active</property>
++                          </object>
++                        </child>
++                      </object>
++                    </child>
++                    <child>
++                      <object class="AdwPreferencesGroup">
++                        <child>
++                          <object class="AdwButtonRow">
++                            <property name="title" translatable="yes">Remove Registration…</property>
++                            <signal name="activated" handler="unregister" swapped="yes"/>
++                            <style>
++                              <class name="destructive-action"/>
++                            </style>
++                          </object>
++                        </child>
++                      </object>
++                    </child>
++                    <child>
++                      <object class="AdwPreferencesGroup" id="products_group">
++                        <property name="title" translatable="yes">Products</property>
++                      </object>
++                    </child>
++                  </object>
++                </property>
++              </object>
++            </property>
++          </object>
++        </child>
++      </object>
++    </property>
++  </template>
++</interface>
+diff --git a/panels/system/subman/gnome-subman-panel.desktop.in b/panels/system/subman/gnome-subman-panel.desktop.in
+new file mode 100644
+index 000000000..ca67b33af
+--- /dev/null
++++ b/panels/system/subman/gnome-subman-panel.desktop.in
+@@ -0,0 +1,14 @@
++[Desktop Entry]
++Name=Registration
++Comment=Enable Red Hat updates, content, and services
++Exec=gnome-control-center system subman
++# Translators: Do NOT translate or transliterate this text (this is an icon file name)!
++Icon=key-symbolic
++Terminal=false
++Type=Application
++NoDisplay=true
++StartupNotify=true
++Categories=GNOME;GTK;Settings;X-GNOME-Settings-Panel;X-GNOME-SystemSettings;
++OnlyShowIn=GNOME;Unity;
++# Translators: Search terms to find the Users panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
++Keywords=Registration;Subscription;Red Hat;Products;Updates;Registry;Account;Activation;Register;Subscribe;
+diff --git a/panels/system/subman/meson.build b/panels/system/subman/meson.build
+new file mode 100644
+index 000000000..58a99ee49
+--- /dev/null
++++ b/panels/system/subman/meson.build
+@@ -0,0 +1,9 @@
++desktop = 'gnome-subman-panel.desktop'
++i18n.merge_file(
++  type: 'desktop',
++  input: desktop + '.in',
++  output: desktop,
++  po_dir: po_dir,
++  install: true,
++  install_dir: control_center_desktopdir
++)
+diff --git a/panels/system/system.gresource.xml b/panels/system/system.gresource.xml
+index acb4169b1..3d5c0684e 100644
+--- a/panels/system/system.gresource.xml
++++ b/panels/system/system.gresource.xml
+@@ -29,9 +29,12 @@
+     <file preprocess="xml-stripblanks">users/cc-user-page.ui</file>
+     <file alias="users/join-dialog.ui" preprocess="xml-stripblanks">users/data/join-dialog.ui</file>
+     <file>users/users.css</file>
++
++    <file preprocess="xml-stripblanks">subman/cc-subman-page.ui</file>
+   </gresource>
+ 
+   <gresource prefix="/org/gnome/Settings">
++    <file preprocess="xml-stripblanks">icons/scalable/actions/key-symbolic.svg</file>
+     <file preprocess="xml-stripblanks">icons/scalable/actions/system-update-symbolic.svg</file>
+     <file preprocess="xml-stripblanks">icons/scalable/status/fingerprint-detection-complete-symbolic.svg</file>
+     <file preprocess="xml-stripblanks">icons/scalable/status/fingerprint-detection-symbolic.svg</file>
+-- 
+2.47.0
+
