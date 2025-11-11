@@ -1,0 +1,136 @@
+From c2c0109398b017e0b15cd942504b855c5b93aa95 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Tue, 4 Mar 2025 12:38:02 +0100
+Subject: [PATCH] keyboard: Add "Activities Overview Shortcut" toggle
+
+Per mockups in
+https://issues.redhat.com/secure/attachment/13192825/13192825_super-key-setting.png
+
+Often users will want to disable the "Super_L" shortcut which triggers
+the overview.
+
+By design we don't want to expose a setting to replace the overview
+shortcut with another shortcut because the Super key is treated differently
+by Mutter. Unlike typical shortcuts which combine a regular key
+(e.g., 'x', '2', 'Esc') with optional modifiers (e.g., 'super', 'control'),
+the overview shortcut uses the Super key as if it were a regular key
+rather than a modifier. This was explained to me by fmuellner.
+
+Fixes #1873
+---
+ panels/keyboard/cc-keyboard-shortcut-dialog.c | 35 +++++++++++++++++++
+ .../keyboard/cc-keyboard-shortcut-dialog.ui   | 11 ++++++
+ 2 files changed, 46 insertions(+)
+
+diff --git a/panels/keyboard/cc-keyboard-shortcut-dialog.c b/panels/keyboard/cc-keyboard-shortcut-dialog.c
+index 4c72b2426..950c41dc5 100644
+--- a/panels/keyboard/cc-keyboard-shortcut-dialog.c
++++ b/panels/keyboard/cc-keyboard-shortcut-dialog.c
+@@ -40,12 +40,15 @@
+ #include "cc-util.h"
+ #include "keyboard-shortcuts.h"
+ 
++#define DEFAULT_ACTIVITIES_OVERVIEW_SHORTCUT "Super_L"
++
+ struct _CcKeyboardShortcutDialog
+ {
+   AdwWindow             parent_instance;
+ 
+   AdwNavigationView    *navigation_view;
+   AdwNavigationPage    *main_page;
++  AdwSwitchRow         *overview_shortcut_row;
+   AdwButtonRow         *reset_all_button_row;
+   AdwDialog            *reset_all_dialog;
+   GtkSearchEntry       *search_entry;
+@@ -357,6 +360,8 @@ on_reset_all_dialog_response_cb (CcKeyboardShortcutDialog *self)
+           cc_keyboard_manager_reset_shortcut (self->manager, item);
+         }
+     }
++
++  adw_switch_row_set_active (self->overview_shortcut_row, TRUE);
+ }
+ 
+ static void
+@@ -453,6 +458,27 @@ shortcut_section_row_activated_cb (CcKeyboardShortcutDialog *self,
+   shortcut_custom_items_changed (self);
+ }
+ 
++static gboolean
++get_overview_shortcut_setting (GValue   *value,
++                               GVariant *variant,
++                               gpointer  user_data)
++{
++  gboolean enabled = g_strcmp0 (g_variant_get_string (variant, NULL), DEFAULT_ACTIVITIES_OVERVIEW_SHORTCUT) == 0;
++  g_value_set_boolean (value, enabled);
++
++  return TRUE;
++}
++
++static GVariant *
++set_overview_shortcut_setting (const GValue       *value,
++                               const GVariantType *variant,
++                               gpointer            user_data)
++{
++  gboolean enabled = g_value_get_boolean (value);
++
++  return g_variant_new_string (enabled ? DEFAULT_ACTIVITIES_OVERVIEW_SHORTCUT : "");
++}
++
+ static void
+ cc_keyboard_shortcut_dialog_constructed (GObject *object)
+ {
+@@ -500,6 +526,7 @@ cc_keyboard_shortcut_dialog_class_init (CcKeyboardShortcutDialogClass *klass)
+ 
+   gtk_widget_class_bind_template_child (widget_class, CcKeyboardShortcutDialog, navigation_view);
+   gtk_widget_class_bind_template_child (widget_class, CcKeyboardShortcutDialog, main_page);
++  gtk_widget_class_bind_template_child (widget_class, CcKeyboardShortcutDialog, overview_shortcut_row);
+   gtk_widget_class_bind_template_child (widget_class, CcKeyboardShortcutDialog, reset_all_button_row);
+   gtk_widget_class_bind_template_child (widget_class, CcKeyboardShortcutDialog, reset_all_dialog);
+   gtk_widget_class_bind_template_child (widget_class, CcKeyboardShortcutDialog, search_entry);
+@@ -527,6 +554,7 @@ static void
+ cc_keyboard_shortcut_dialog_init (CcKeyboardShortcutDialog *self)
+ {
+   GtkWindow *toplevel;
++  g_autoptr(GSettings) mutter_settings = g_settings_new ("org.gnome.mutter");
+ 
+   gtk_widget_init_template (GTK_WIDGET (self));
+   shortcut_dialog_visible_page_changed_cb (self);
+@@ -558,6 +586,13 @@ cc_keyboard_shortcut_dialog_init (CcKeyboardShortcutDialog *self)
+                            G_LIST_MODEL (self->sections),
+                            shortcut_dialog_row_new,
+                            self, NULL);
++
++  g_settings_bind_with_mapping (mutter_settings, "overlay-key",
++                                self->overview_shortcut_row, "active",
++				G_SETTINGS_BIND_DEFAULT,
++				get_overview_shortcut_setting,
++				set_overview_shortcut_setting,
++				NULL, NULL);
+ }
+ 
+ GtkWidget*
+diff --git a/panels/keyboard/cc-keyboard-shortcut-dialog.ui b/panels/keyboard/cc-keyboard-shortcut-dialog.ui
+index 35e0e45f2..152791ca9 100644
+--- a/panels/keyboard/cc-keyboard-shortcut-dialog.ui
++++ b/panels/keyboard/cc-keyboard-shortcut-dialog.ui
+@@ -67,6 +67,17 @@
+                             </child>
+                           </object>
+                         </child>
++			<child>
++			  <object class="AdwPreferencesGroup">
++			    <child>
++			      <object class="AdwSwitchRow" id="overview_shortcut_row">
++				<property name="title" translatable="yes">Activities _Overview Shortcut</property>
++				<property name="use-underline">True</property>
++				<property name="subtitle" translatable="yes">Use the Super key to open the overview</property>
++			      </object>
++			    </child>
++			  </object>
++			</child>
+                         <child>
+                           <object class="AdwPreferencesGroup">
+                             <child>
+-- 
+2.49.0
+

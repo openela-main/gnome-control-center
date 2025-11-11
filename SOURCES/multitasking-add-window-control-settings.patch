@@ -1,0 +1,158 @@
+From b404400352ab118b77bf8ddf42db477087a1ef87 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Fri, 6 Jun 2025 10:30:00 +0200
+Subject: [PATCH] multitasking: Introduce "Window Controls" section
+
+This allows setting the visibility of the minimize and maximize
+window control buttons. These buttons are standard on other platforms
+and some users/vendors might opt to expose them.
+
+This setting is present in GNOME Tweaks but given its not available in
+RHEL, we are bringing a subset of this setting to GNOME Settings.
+
+By design:
+
+  * We don't allow reordering the buttons neither moving them to the
+    opposite side of the window.
+
+  * We only allow toggling the visibility of "maximize" and/or
+    "minimize" buttons.
+
+  * The "close" button is always visible. The pre-dermined order is
+    always: "minimize,maximize,close".
+
+There are prior discussions about this feature in:
+- Teams/Design/whiteboards#87
+- #2006
+- https://discourse.gnome.org/t/titlebar-buttons/10669/32
+
+Related: RHEL-22606
+---
+ panels/multitasking/cc-multitasking-panel.c  | 54 ++++++++++++++++++++
+ panels/multitasking/cc-multitasking-panel.ui | 21 ++++++++
+ 2 files changed, 75 insertions(+)
+
+diff --git a/panels/multitasking/cc-multitasking-panel.c b/panels/multitasking/cc-multitasking-panel.c
+index be3d3dec7..cb667df3e 100644
+--- a/panels/multitasking/cc-multitasking-panel.c
++++ b/panels/multitasking/cc-multitasking-panel.c
+@@ -41,6 +41,8 @@ struct _CcMultitaskingPanel
+   GtkCheckButton  *fixed_workspaces_radio;
+   CcIllustratedRow *hot_corner_row;
+   GtkSwitch       *hot_corner_switch;
++  AdwSwitchRow    *maximize_row;
++  AdwSwitchRow    *minimize_row;
+   AdwSpinRow      *number_of_workspaces_spin_row;
+   GtkCheckButton  *workspaces_primary_display_radio;
+   GtkCheckButton  *workspaces_span_displays_radio;
+@@ -48,6 +50,48 @@ struct _CcMultitaskingPanel
+ 
+ CC_PANEL_REGISTER (CcMultitaskingPanel, cc_multitasking_panel)
+ 
++static void
++set_window_controls (CcMultitaskingPanel *self)
++{
++  g_autofree gchar *layout = NULL;
++  g_autofree gchar *topbar_layout = NULL;
++  gboolean maximize, minimize;
++
++  maximize = adw_switch_row_get_active (self->maximize_row);;
++  minimize = adw_switch_row_get_active (self->minimize_row);;
++
++  if (minimize && maximize)
++    layout = g_strdup ("minimize,maximize,");
++  else if (minimize)
++    layout = g_strdup ("minimize,");
++  else if (maximize)
++    layout = g_strdup ("maximize,");
++  else
++    layout = g_strdup ("");
++
++  topbar_layout = g_strdup_printf ("appmnenu:%sclose", layout);
++  g_settings_set_string (self->wm_settings,
++                         "button-layout",
++                         topbar_layout);
++}
++
++static void
++get_window_controls (CcMultitaskingPanel *self)
++{
++  g_autofree gchar *layout = NULL;
++
++  layout = g_settings_get_string (self->wm_settings, "button-layout");
++
++  g_signal_handlers_block_by_func (self->maximize_row, set_window_controls, self);
++  g_signal_handlers_block_by_func (self->minimize_row, set_window_controls, self);
++
++  adw_switch_row_set_active (self->maximize_row, g_strrstr (layout, "maximize") != NULL);
++  adw_switch_row_set_active (self->minimize_row, g_strrstr (layout, "minimize") != NULL);
++
++  g_signal_handlers_unblock_by_func (self->maximize_row, set_window_controls, self);
++  g_signal_handlers_unblock_by_func (self->minimize_row, set_window_controls, self);
++}
++
+ /* GObject overrides */
+ 
+ static void
+@@ -83,9 +127,13 @@ cc_multitasking_panel_class_init (CcMultitaskingPanelClass *klass)
+   gtk_widget_class_bind_template_child (widget_class, CcMultitaskingPanel, fixed_workspaces_radio);
+   gtk_widget_class_bind_template_child (widget_class, CcMultitaskingPanel, hot_corner_row);
+   gtk_widget_class_bind_template_child (widget_class, CcMultitaskingPanel, hot_corner_switch);
++  gtk_widget_class_bind_template_child (widget_class, CcMultitaskingPanel, maximize_row);
++  gtk_widget_class_bind_template_child (widget_class, CcMultitaskingPanel, minimize_row);
+   gtk_widget_class_bind_template_child (widget_class, CcMultitaskingPanel, number_of_workspaces_spin_row);
+   gtk_widget_class_bind_template_child (widget_class, CcMultitaskingPanel, workspaces_primary_display_radio);
+   gtk_widget_class_bind_template_child (widget_class, CcMultitaskingPanel, workspaces_span_displays_radio);
++
++  gtk_widget_class_bind_template_callback (widget_class, set_window_controls);
+ }
+ 
+ static void
+@@ -138,6 +186,12 @@ cc_multitasking_panel_init (CcMultitaskingPanel *self)
+                    "value",
+                    G_SETTINGS_BIND_DEFAULT | G_SETTINGS_BIND_NO_SENSITIVITY);
+ 
++  g_signal_connect_swapped (self->wm_settings,
++                            "changed::button-layout",
++                            G_CALLBACK (get_window_controls),
++                            self);
++  get_window_controls (self);
++
+   self->shell_settings = g_settings_new ("org.gnome.shell.app-switcher");
+ 
+   if (g_settings_get_boolean (self->shell_settings, "current-workspace-only"))
+diff --git a/panels/multitasking/cc-multitasking-panel.ui b/panels/multitasking/cc-multitasking-panel.ui
+index 019e46430..5e2f5742a 100644
+--- a/panels/multitasking/cc-multitasking-panel.ui
++++ b/panels/multitasking/cc-multitasking-panel.ui
+@@ -97,6 +97,27 @@
+               </object>
+             </child>
+ 
++            <!-- Window Controls -->
++            <child>
++              <object class="AdwPreferencesGroup">
++                <property name="title" translatable="yes">Window Controls</property>
++                <child>
++                  <object class="AdwSwitchRow" id="maximize_row">
++                    <property name="use-underline">True</property>
++                    <property name="title" translatable="yes">_Maximize</property>
++                    <signal name="notify::active" handler="set_window_controls" object="CcMultitaskingPanel" swapped="yes"/>
++                  </object>
++                </child>
++                <child>
++                  <object class="AdwSwitchRow" id="minimize_row">
++                    <property name="use-underline">True</property>
++                    <property name="title" translatable="yes">Minimi_ze</property>
++                    <signal name="notify::active" handler="set_window_controls" object="CcMultitaskingPanel" swapped="yes"/>
++                  </object>
++                </child>
++              </object>
++            </child>
++
+             <child>
+               <object class="AdwPreferencesGroup">
+                 <property name="title" translatable="yes">Multi-Monitor</property>
+-- 
+2.47.1
+

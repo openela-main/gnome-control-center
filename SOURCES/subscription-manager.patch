@@ -1,4 +1,4 @@
-From 015fd59e65295e8507f7df389833a6ba443c463f Mon Sep 17 00:00:00 2001
+From 8853db5e3a0805b5a5233b40dd995b5eaaf14bd7 Mon Sep 17 00:00:00 2001
 From: Felipe Borges <felipeborges@gnome.org>
 Date: Thu, 30 Jan 2025 13:53:29 +0100
 Subject: [PATCH] system: Add subscription manager (Registration) page
@@ -1121,13 +1121,13 @@ index 000000000..58a99ee49
 +  install_dir: control_center_desktopdir
 +)
 diff --git a/panels/system/system.gresource.xml b/panels/system/system.gresource.xml
-index acb4169b1..3d5c0684e 100644
+index 72b8bcc36..a298fe24f 100644
 --- a/panels/system/system.gresource.xml
 +++ b/panels/system/system.gresource.xml
-@@ -29,9 +29,12 @@
-     <file preprocess="xml-stripblanks">users/cc-user-page.ui</file>
+@@ -30,9 +30,12 @@
      <file alias="users/join-dialog.ui" preprocess="xml-stripblanks">users/data/join-dialog.ui</file>
      <file>users/users.css</file>
+     <file alias="wordlist.txt">eff_short_wordlist_2_0.txt</file>
 +
 +    <file preprocess="xml-stripblanks">subman/cc-subman-page.ui</file>
    </gresource>
@@ -1138,5 +1138,5 @@ index acb4169b1..3d5c0684e 100644
      <file preprocess="xml-stripblanks">icons/scalable/status/fingerprint-detection-complete-symbolic.svg</file>
      <file preprocess="xml-stripblanks">icons/scalable/status/fingerprint-detection-symbolic.svg</file>
 -- 
-2.47.0
+2.49.0
 
