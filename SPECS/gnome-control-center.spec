@@ -14,7 +14,7 @@
 
 Name:           gnome-control-center
 Version:        40.0
-Release:        39%{?dist}
+Release:        42%{?dist}
 Summary:        Utilities to configure the GNOME desktop
 
 License:        GPLv2+ and CC-BY-SA
@@ -60,7 +60,7 @@ Patch16:        background-solid-colors.patch
 
 Patch17:        0001-wacom-Group-devices-using-libwacom-API-too.patch
 
-# Needs Jira ticket
+# https://issues.redhat.com/browse/RHEL-71937
 Patch18:        power-button-action-server.patch
 
 # https://issues.redhat.com/browse/RHEL-50729
@@ -72,8 +72,16 @@ Patch20:        keyboard-dont-force-compose-key-value.patch
 # https://issues.redhat.com/browse/RHEL-4196
 Patch21:        display-draw-larger-monitors-when-multiple.patch
 
-# https://issues.redhat.com/browse/RHEL-109584
-Patch22:        power-handle-unknown-power-profile.patch
+# https://issues.redhat.com/browse/RHEL-4193
+Patch22:        wwan-handle-gsm_sim_virtual-modems.patch
+
+# https://issues.redhat.com/browse/RHEL-4101
+Patch23:        subman-allow-launch-registration-directly.patch
+
+# https://issues.redhat.com/browse/RHEL-11909
+Patch24:        po-update-keyboard-zh_CN-translations.patch
+
+Patch25:	power-handle-unknown-power-profile.patch
 
 BuildRequires:  chrpath
 BuildRequires:  cups-devel
@@ -264,9 +272,20 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gnome-control-center
 %dir %{_datadir}/gnome/wm-properties
 
 %changelog
-* Mon Aug 18 2025 Felipe Borges <feborges@redhat.com> - 40.0-39
+* Thu Aug 14 2025 Felipe Borges <feborges@redhat.com> - 40.0-42
 - Fix crash with non-supported tuned-ppd profiles
-  Related: RHEL-109584
+
+* Thu Feb 27 2025 Felipe Borges <feborges@redhat.com> - 40.0-41
+- Update zh_CN translations for Keyboard settings
+  Related: RHEL-11909
+
+* Thu Feb 27 2025 Felipe Borges <feborges@redhat.com> - 40.0-40
+- Allow launching subscription registration dialog directly
+  Related: RHEL-4101
+
+* Thu Feb 27 2025 Felipe Borges <feborges@redhat.com> - 40.0-39
+- Handle gsm_sim virtual modems in Mobile Networks settings
+  Resolves: RHEL-4193
 
 * Thu Jan 23 2025 Felipe Borges <feborges@redhat.com> - 40.0-38
 - Scale up monitors drawing in display arrangment settings when multiple monitors

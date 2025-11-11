@@ -1,0 +1,85 @@
+From c4b6fdcc4b75cb106d724a9e3247539da9f84c74 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Thu, 30 Jan 2025 17:47:40 +0100
+Subject: [PATCH] info-overview, subman: Add option to launch subman dialog
+ directly
+
+That's `gnome-control-center info-overview subman-register`
+
+See https://issues.redhat.com/browse/RHEL-4101
+---
+ panels/info-overview/cc-info-overview-panel.c | 44 +++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+
+diff --git a/panels/info-overview/cc-info-overview-panel.c b/panels/info-overview/cc-info-overview-panel.c
+index a24551c23..8c5f92e64 100644
+--- a/panels/info-overview/cc-info-overview-panel.c
++++ b/panels/info-overview/cc-info-overview-panel.c
+@@ -111,6 +111,11 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (VersionData, version_data_free);
+ 
+ G_DEFINE_TYPE (CcInfoOverviewPanel, cc_info_overview_panel, CC_TYPE_PANEL)
+ 
++enum {
++  PROP_0,
++  PROP_PARAMETERS
++};
++
+ static void
+ version_start_element_handler (GMarkupParseContext      *ctx,
+                                const char               *element_name,
+@@ -1096,6 +1101,42 @@ cc_info_overview_panel_finalize (GObject *object)
+   G_OBJECT_CLASS (cc_info_overview_panel_parent_class)->finalize (object);
+ }
+ 
++static void
++cc_info_overview_panel_set_property (GObject      *object,
++                                     guint         property_id,
++                                     const GValue *value,
++                                     GParamSpec   *pspec)
++{
++  CcInfoOverviewPanel *self = CC_INFO_OVERVIEW_PANEL (object);
++
++  switch (property_id)
++    {
++      case PROP_PARAMETERS:
++        {
++          GVariant *parameters, *v;
++          const gchar *first_arg = NULL;
++
++          parameters = g_value_get_variant (value);
++          if (parameters == NULL)
++            return;
++
++          if (g_variant_n_children (parameters) > 0)
++            {
++              g_variant_get_child (parameters, 0, "v", &v);
++              if (g_variant_is_of_type (v, G_VARIANT_TYPE_STRING))
++                first_arg = g_variant_get_string (v, NULL);
++              else
++                g_warning ("Wrong type for the second argument GVariant, expected 's' but got '%s'",
++                           (gchar *)g_variant_get_type (v));
++              g_variant_unref (v);
++            }
++
++          if (g_strcmp0 (first_arg, "subman-register") == 0)
++            open_subscription_register_dialog (self);
++        }
++    }
++}
++
+ static void
+ cc_info_overview_panel_class_init (CcInfoOverviewPanelClass *klass)
+ {
+@@ -1103,6 +1144,9 @@ cc_info_overview_panel_class_init (CcInfoOverviewPanelClass *klass)
+   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS (klass);
+ 
+   object_class->finalize = cc_info_overview_panel_finalize;
++  object_class->set_property = cc_info_overview_panel_set_property;
++
++  g_object_class_override_property (object_class, PROP_PARAMETERS, "parameters");
+ 
+   gtk_widget_class_set_template_from_resource (widget_class, "/org/gnome/control-center/info-overview/cc-info-overview-panel.ui");
+ 
+-- 
+2.48.1
+
