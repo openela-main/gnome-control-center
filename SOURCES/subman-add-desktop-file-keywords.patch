@@ -1,0 +1,22 @@
+From b3b249d541bf4f715535637688ea928dd1a18713 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Mon, 3 Nov 2025 14:16:16 +0100
+Subject: [PATCH] info, subman: Add search keywords for subscription manager
+
+---
+ panels/info/gnome-info-overview-panel.desktop.in.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/panels/info/gnome-info-overview-panel.desktop.in.in b/panels/info/gnome-info-overview-panel.desktop.in.in
+index 8b939b6e3..c32d4c36e 100644
+--- a/panels/info/gnome-info-overview-panel.desktop.in.in
++++ b/panels/info/gnome-info-overview-panel.desktop.in.in
+@@ -19,4 +19,4 @@ X-GNOME-Bugzilla-Version=@VERSION@
+ # The list MUST also end with a semicolon!
+ # "Preferred Applications" is the old name for the preference, so make
+ # sure that you use the same "translation" for those keywords
+-Keywords=device;system;information;memory;processor;version;default;application;preferred;cd;dvd;usb;audio;video;disc;removable;media;autorun;
++Keywords=device;system;information;memory;processor;version;default;application;preferred;cd;dvd;usb;audio;video;disc;removable;media;autorun;register;registration;subscribe;subscription;
+-- 
+2.51.0
+

@@ -11,7 +11,7 @@
 
 Name:           gnome-control-center
 Version:        3.28.2
-Release:        37%{?dist}
+Release:        39%{?dist}
 Summary:        Utilities to configure the GNOME desktop
 
 License:        GPLv2+ and CC-BY-SA
@@ -92,6 +92,12 @@ Patch43:        0001-wifi-Move-airplane-mode-widget-above-the-main-stack.patch
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=1926995
 Patch44:        0001-shell-Avoid-handling-map-events-from-other-windows.patch
+
+# https://bugzilla.redhat.com/show_bug.cgi?id=1937113#c13
+Patch45:        subman-add-desktop-file-keywords.patch
+
+# https://issues.redhat.com/browse/RHEL-4180
+Patch46:        fix-translation-of-icon-names.patch
 
 BuildRequires:  chrpath
 BuildRequires:  cups-devel
@@ -266,7 +272,15 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gnome-control-center
 %dir %{_datadir}/gnome/wm-properties
 
 %changelog
-* Mon Jan 02 2023 Felipe Borges <feborges@redhat.com> - 4.28.2-37
+* Thu Nov 6 2025 Felipe Borges <feborges@redhat.com> - 3.28.2-39
+- Fix missing icons in some languages (broken translations)
+  Resolves RHEL-4180
+
+* Mon Nov 3 2025 Felipe Borges <feborges@redhat.com> - 3.28.2-38
+- Add subscription manager keywords to find Subscription settings
+  Resolves #1937113
+
+* Mon Jan 02 2023 Felipe Borges <feborges@redhat.com> - 3.28.2-37
 - Fix keyboard accessibility of screen resolution list
   Resolves: #1926995
 

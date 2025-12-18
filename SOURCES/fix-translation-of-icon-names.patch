@@ -1,0 +1,343 @@
+From d1b9674d5cdfad5abad1387aaeb12652042aca80 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Thu, 6 Nov 2025 14:50:16 +0100
+Subject: [PATCH] po: Fix translations of icon names
+
+These strings were translated when they shouldn't.
+
+This is a shortcoming of the old way of merging translations in
+a Desktop File. This caused the value of the "Icon=" desktop file
+key to be marked as translatable.
+
+In newer versions, the icon names are no longer exposed to the
+translation machinery.
+
+Fixes https://issues.redhat.com/browse/RHEL-4180
+---
+ po/ar.po       | 4 ++--
+ po/ca.po       | 8 ++++----
+ po/da.po       | 2 +-
+ po/fur.po      | 4 ++--
+ po/hu.po       | 4 ++--
+ po/it.po       | 2 +-
+ po/ja.po       | 6 +++---
+ po/pa.po       | 4 ++--
+ po/pt_BR.po    | 4 ++--
+ po/sl.po       | 2 +-
+ po/sr.po       | 4 ++--
+ po/sr@latin.po | 4 ++--
+ po/vi.po       | 2 +-
+ po/zh_CN.po    | 6 +++---
+ 14 files changed, 28 insertions(+), 28 deletions(-)
+
+diff --git a/po/ar.po b/po/ar.po
+index 2f33a7593..388a17c96 100644
+--- a/po/ar.po
++++ b/po/ar.po
+@@ -224,7 +224,7 @@ msgstr "شغّل أو أغلق بلوتوث لتوصيل جهازك بالأجه
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:6
+ msgid "bluetooth"
+-msgstr "بلوتوث"
++msgstr "bluetooth"
+ 
+ #. Translators: Search terms to find the Bluetooth panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:19
+@@ -7332,7 +7332,7 @@ msgstr "أنهِ"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: shell/gnome-control-center.desktop.in.in:5
+ msgid "gnome-control-center"
+-msgstr ""
++msgstr "gnome-control-center"
+ 
+ #. Translators: Search terms to find this application. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: shell/gnome-control-center.desktop.in.in:17
+diff --git a/po/ca.po b/po/ca.po
+index 36172d97e..f6539c635 100644
+--- a/po/ca.po
++++ b/po/ca.po
+@@ -235,7 +235,7 @@ msgstr "Activeu i desactiveu el Bluetooth i connecteu els dispositius"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:6
+ msgid "bluetooth"
+-msgstr "Bluetooth"
++msgstr "bluetooth"
+ 
+ #. Translators: Search terms to find the Bluetooth panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:19
+@@ -1469,7 +1469,7 @@ msgstr "Configura les aplicacions per defecte"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:7
+ msgid "starred"
+-msgstr "destacat"
++msgstr "starred"
+ 
+ #. Translators: Search terms to find the Default Applications panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:19
+@@ -3820,7 +3820,7 @@ msgstr "Connecteu-vos als comptes en línia i decidiu quin ús en voleu fer"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/online-accounts/gnome-online-accounts-panel.desktop.in.in:7
+ msgid "goa-panel"
+-msgstr "goa-quadre"
++msgstr "goa-panel"
+ 
+ #. Translators: Search terms to find the Online Accounts panel.
+ #. Do NOT translate or localize the semicolons!
+@@ -4319,7 +4319,7 @@ msgstr ""
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:7
+ msgid "printer"
+-msgstr "impressora"
++msgstr "printer"
+ 
+ #. Translators: Search terms to find the Printers panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:16
+diff --git a/po/da.po b/po/da.po
+index bfcd0342c..ddfb54c19 100644
+--- a/po/da.po
++++ b/po/da.po
+@@ -1473,7 +1473,7 @@ msgstr "Opsætning af standardprogrammer"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:7
+ msgid "starred"
+-msgstr "stjerne"
++msgstr "starred"
+ 
+ #. Translators: Search terms to find the Default Applications panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:19
+diff --git a/po/fur.po b/po/fur.po
+index 5398515d8..29e444ad2 100644
+--- a/po/fur.po
++++ b/po/fur.po
+@@ -1454,7 +1454,7 @@ msgstr "Configure lis aplicazions predefinidis"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:7
+ msgid "starred"
+-msgstr "stelât"
++msgstr "starred"
+ 
+ #. Translators: Search terms to find the Default Applications panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:19
+@@ -4301,7 +4301,7 @@ msgstr "Zonte stampants, mostre i lavôrs di stampe e decît ce mût stampâ"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:7
+ msgid "printer"
+-msgstr "stampant"
++msgstr "printer"
+ 
+ #. Translators: Search terms to find the Printers panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:16
+diff --git a/po/hu.po b/po/hu.po
+index 41b0e5119..5e15b237c 100644
+--- a/po/hu.po
++++ b/po/hu.po
+@@ -1458,7 +1458,7 @@ msgstr "Alap alkalmazások beállítása"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:7
+ msgid "starred"
+-msgstr "csillagozott"
++msgstr "starred"
+ 
+ #. Translators: Search terms to find the Default Applications panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:19
+@@ -4312,7 +4312,7 @@ msgstr ""
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:7
+ msgid "printer"
+-msgstr "nyomtató"
++msgstr "printer"
+ 
+ #. Translators: Search terms to find the Printers panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:16
+diff --git a/po/it.po b/po/it.po
+index 1390c7ce5..89f2447c4 100644
+--- a/po/it.po
++++ b/po/it.po
+@@ -1472,7 +1472,7 @@ msgstr "Configurazione applicazioni predefinite"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:7
+ msgid "starred"
+-msgstr "preferito"
++msgstr "starred"
+ 
+ #. Translators: Search terms to find the Default Applications panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:19
+diff --git a/po/ja.po b/po/ja.po
+index f9ad4605c..66c36670c 100644
+--- a/po/ja.po
++++ b/po/ja.po
+@@ -1632,7 +1632,7 @@ msgstr "既定のアプリケーションを設定します"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:7
+ msgid "starred"
+-msgstr "星付き"
++msgstr "starred"
+ 
+ #. Translators: Search terms to find the Default Applications panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:19
+@@ -3954,7 +3954,7 @@ msgstr "オンラインアカウントへの接続や利用方法を設定しま
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/online-accounts/gnome-online-accounts-panel.desktop.in.in:7
+ msgid "goa-panel"
+-msgstr "ゴアパネル"
++msgstr "goa-panel"
+ 
+ #. Translators: Search terms to find the Online Accounts panel.
+ #. Do NOT translate or localize the semicolons!
+@@ -4438,7 +4438,7 @@ msgstr "プリンターの追加、プリンタージョブの表示、印刷方
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:7
+ msgid "printer"
+-msgstr "プリンター"
++msgstr "printer"
+ 
+ #. Translators: Search terms to find the Printers panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:16
+diff --git a/po/pa.po b/po/pa.po
+index a89492155..80438ffe4 100644
+--- a/po/pa.po
++++ b/po/pa.po
+@@ -227,7 +227,7 @@ msgstr "ਬਲੂਟੁੱਥ ਜੰਤਰ ਨੂੰ ਚਾਲੂ ਤੇ ਬੰ
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:6
+ #| msgid "Bluetooth"
+ msgid "bluetooth"
+-msgstr "ਬਲੂਟੁੱਥ"
++msgstr "bluetooth"
+ 
+ #. Translators: Search terms to find the Bluetooth panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:19
+@@ -4320,7 +4320,7 @@ msgstr ""
+ #: panels/printers/gnome-printers-panel.desktop.in.in:7
+ #| msgid "No printers"
+ msgid "printer"
+-msgstr "ਪਰਿੰਟਰ"
++msgstr "printer"
+ 
+ #. Translators: Search terms to find the Printers panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:16
+diff --git a/po/pt_BR.po b/po/pt_BR.po
+index fc221f2b6..7f5234146 100644
+--- a/po/pt_BR.po
++++ b/po/pt_BR.po
+@@ -1708,7 +1708,7 @@ msgstr "Configure os aplicativos padrão"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:7
+ msgid "starred"
+-msgstr "destacado"
++msgstr "starred"
+ 
+ #. Translators: Search terms to find the Default Applications panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:19
+@@ -4591,7 +4591,7 @@ msgstr ""
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:7
+ msgid "printer"
+-msgstr "Impressora"
++msgstr "printer"
+ 
+ #. Translators: Search terms to find the Printers panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:16
+diff --git a/po/sl.po b/po/sl.po
+index 5008f6465..1f2c4df73 100644
+--- a/po/sl.po
++++ b/po/sl.po
+@@ -226,7 +226,7 @@ msgstr "Vklopite in izklopite Bluetooth in povežite svoje naprave"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:6
+ msgid "bluetooth"
+-msgstr "Bluetooth"
++msgstr "bluetooth"
+ 
+ #. Translators: Search terms to find the Bluetooth panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:19
+diff --git a/po/sr.po b/po/sr.po
+index 66046295b..ace178779 100644
+--- a/po/sr.po
++++ b/po/sr.po
+@@ -229,7 +229,7 @@ msgstr "Укључите или искључите блутут и повежи
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:6
+ msgid "bluetooth"
+-msgstr "блутут"
++msgstr "bluetooth"
+ 
+ #. Translators: Search terms to find the Bluetooth panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:19
+@@ -4329,7 +4329,7 @@ msgstr ""
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:7
+ msgid "printer"
+-msgstr "штампач"
++msgstr "printer"
+ 
+ #. Translators: Search terms to find the Printers panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:16
+diff --git a/po/sr@latin.po b/po/sr@latin.po
+index af97f3c5c..e92718c71 100644
+--- a/po/sr@latin.po
++++ b/po/sr@latin.po
+@@ -225,7 +225,7 @@ msgstr "Uključite ili isključite blutut i povežite vaše uređaje"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:6
+ msgid "bluetooth"
+-msgstr "blutut"
++msgstr "bluetooth"
+ 
+ #. Translators: Search terms to find the Bluetooth panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:19
+@@ -4325,7 +4325,7 @@ msgstr ""
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:7
+ msgid "printer"
+-msgstr "štampač"
++msgstr "printer"
+ 
+ #. Translators: Search terms to find the Printers panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:16
+diff --git a/po/vi.po b/po/vi.po
+index a149bea20..8baf230b2 100644
+--- a/po/vi.po
++++ b/po/vi.po
+@@ -4308,7 +4308,7 @@ msgstr ""
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:7
+ msgid "printer"
+-msgstr "máy in"
++msgstr "printer"
+ 
+ #. Translators: Search terms to find the Printers panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:16
+diff --git a/po/zh_CN.po b/po/zh_CN.po
+index 9755999a2..0e4ae76fe 100644
+--- a/po/zh_CN.po
++++ b/po/zh_CN.po
+@@ -240,7 +240,7 @@ msgstr "开关蓝牙及连接您的设备"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:6
+ msgid "bluetooth"
+-msgstr "蓝牙"
++msgstr "bluetooth"
+ 
+ #. Translators: Search terms to find the Bluetooth panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/bluetooth/gnome-bluetooth-panel.desktop.in.in:19
+@@ -1645,7 +1645,7 @@ msgstr "配置默认应用程序"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:7
+ msgid "starred"
+-msgstr "星"
++msgstr "starred"
+ 
+ #. Translators: Search terms to find the Default Applications panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/info/gnome-default-apps-panel.desktop.in.in:19
+@@ -4451,7 +4451,7 @@ msgstr "添加打印机，查看打印任务和管理打印"
+ #. Translators: Do NOT translate or transliterate this text (this is an icon file name)!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:7
+ msgid "printer"
+-msgstr "打印机"
++msgstr "printer"
+ 
+ #. Translators: Search terms to find the Printers panel. Do NOT translate or localize the semicolons! The list MUST also end with a semicolon!
+ #: panels/printers/gnome-printers-panel.desktop.in.in:16
+-- 
+2.47.3
+
