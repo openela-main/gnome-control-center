@@ -1,0 +1,26 @@
+From f447619873b2a4374a238cd6ea49b740ca0a4ced Mon Sep 17 00:00:00 2001
+From: Carlos Garnacho <carlosg@gnome.org>
+Date: Wed, 17 Sep 2025 06:58:52 +0200
+Subject: [PATCH] calibrator: Avoid clearing background
+
+This is already implicitly done for us as part of the widget redraw.
+---
+ panels/wacom/calibrator/cc-clock.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/panels/wacom/calibrator/cc-clock.c b/panels/wacom/calibrator/cc-clock.c
+index b39ddac..8e73d97 100644
+--- a/panels/wacom/calibrator/cc-clock.c
++++ b/panels/wacom/calibrator/cc-clock.c
+@@ -89,8 +89,6 @@ cc_clock_draw (GtkWidget *widget,
+   gtk_widget_get_allocation (widget, &allocation);
+   angle = cc_clock_get_angle (CC_CLOCK (widget));
+ 
+-  cairo_set_operator (cr, CAIRO_OPERATOR_CLEAR);
+-  cairo_paint (cr);
+   cairo_set_operator (cr, CAIRO_OPERATOR_OVER);
+ 
+   /* Draw the clock background */
+-- 
+2.51.0
+
