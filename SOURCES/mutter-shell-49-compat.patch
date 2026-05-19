@@ -1,0 +1,272 @@
+From eb77c5f1dcfff2fa522cca9f65c3a563f18c5410 Mon Sep 17 00:00:00 2001
+From: Sebastian Keller <skeller@gnome.org>
+Date: Fri, 17 Oct 2025 11:49:24 +0200
+Subject: [PATCH 1/4] keyboard: Update for new default activities overview
+ shortcut
+
+Mutter in 48 gained support for using both Super keys as overlay keys
+and the default value of the overlay-key setting got changed to "Super"
+accordingly. Because the keyboard shortcuts dialog was comparing the
+overlay-key value to the old value of "Super_L" it was wrongly
+considering the overview shortcut to be disabled.
+
+Fix this by comparing to "Super" now, but also check for "Super_L" in
+case somebody has toggled the setting before and as a result does not
+have the new default value.
+
+Related: https://gitlab.gnome.org/GNOME/mutter/-/merge_requests/4050
+Closes: https://gitlab.gnome.org/GNOME/gnome-control-center/-/issues/3586
+(cherry picked from commit 86cff8bcd709677669f1b4243187e04934bb82ed)
+---
+ panels/keyboard/cc-keyboard-shortcut-dialog.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/panels/keyboard/cc-keyboard-shortcut-dialog.c b/panels/keyboard/cc-keyboard-shortcut-dialog.c
+index 950c41dc5..86b9486c9 100644
+--- a/panels/keyboard/cc-keyboard-shortcut-dialog.c
++++ b/panels/keyboard/cc-keyboard-shortcut-dialog.c
+@@ -40,7 +40,8 @@
+ #include "cc-util.h"
+ #include "keyboard-shortcuts.h"
+ 
+-#define DEFAULT_ACTIVITIES_OVERVIEW_SHORTCUT "Super_L"
++#define OLD_ACTIVITIES_OVERVIEW_SHORTCUT "Super_L"
++#define DEFAULT_ACTIVITIES_OVERVIEW_SHORTCUT "Super"
+ 
+ struct _CcKeyboardShortcutDialog
+ {
+@@ -463,7 +464,9 @@ get_overview_shortcut_setting (GValue   *value,
+                                GVariant *variant,
+                                gpointer  user_data)
+ {
+-  gboolean enabled = g_strcmp0 (g_variant_get_string (variant, NULL), DEFAULT_ACTIVITIES_OVERVIEW_SHORTCUT) == 0;
++  const char *overlay_key = g_variant_get_string (variant, NULL);
++  gboolean enabled = g_strcmp0 (overlay_key, DEFAULT_ACTIVITIES_OVERVIEW_SHORTCUT) == 0 ||
++                     g_strcmp0 (overlay_key, OLD_ACTIVITIES_OVERVIEW_SHORTCUT) == 0;
+   g_value_set_boolean (value, enabled);
+ 
+   return TRUE;
+-- 
+2.52.0
+
+
+From b477a9af4ff1774446199a426ee1bcb3230a70ab Mon Sep 17 00:00:00 2001
+From: Daniel van Vugt <daniel.van.vugt@canonical.com>
+Date: Sun, 22 Jun 2025 16:55:41 +0800
+Subject: [PATCH 2/4] display: Don't round all scales to 25% increments
+
+Because soon other increments will be supported and we should display
+those correctly at least to 1% accuracy.
+
+(cherry picked from commit 8de08a91d8c56fab504338ceeb621cd371f0e12f)
+---
+ panels/display/cc-display-settings.c | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
+
+diff --git a/panels/display/cc-display-settings.c b/panels/display/cc-display-settings.c
+index 5b6eb015a..86043b51a 100644
+--- a/panels/display/cc-display-settings.c
++++ b/panels/display/cc-display-settings.c
+@@ -324,17 +324,10 @@ make_resolution_string (CcDisplayMode *mode)
+     return g_strdup_printf ("%d × %d%s", width, height, interlaced);
+ }
+ 
+-static double
+-round_scale_for_ui (double scale)
+-{
+-  /* Keep in sync with mutter */
+-  return round (scale*4)/4;
+-}
+-
+ static gchar *
+ make_scale_string (gdouble scale)
+ {
+-  return g_strdup_printf ("%d %%", (int) (round_scale_for_ui (scale)*100));
++  return g_strdup_printf ("%d %%", (int) (scale * 100));
+ }
+ 
+ static gint
+-- 
+2.52.0
+
+
+From cdaf66e5dad5aac2dad77908f21cda29cb65faa3 Mon Sep 17 00:00:00 2001
+From: Sebastian Wick <sebastian.wick@redhat.com>
+Date: Wed, 20 Aug 2025 12:43:04 +0200
+Subject: [PATCH 3/4] power: Replace SettingsDaemon.Power.Screen with
+ Shell.Brightness
+
+With the recent backlight/brightness reshuffling, SettingsDaemon is not in
+control of screen brightness anymore. Instead, org.gnome.Shell.Brightness now
+exposes a single HasBrightnessControl property which tells us if any display
+has brightness control.
+
+(cherry picked from commit 37a2495dd3b8016a17e5c12ef7799a19fb0324dd)
+---
+ panels/power/cc-power-panel.c | 78 ++++++++++++++---------------------
+ 1 file changed, 31 insertions(+), 47 deletions(-)
+
+diff --git a/panels/power/cc-power-panel.c b/panels/power/cc-power-panel.c
+index 04f737977..9098b4506 100644
+--- a/panels/power/cc-power-panel.c
++++ b/panels/power/cc-power-panel.c
+@@ -72,7 +72,8 @@ struct _CcPowerPanel
+ 
+   GDBusProxy    *iio_proxy;
+   guint          iio_proxy_watch_id;
+-  gboolean       has_brightness;
++  GDBusProxy    *shell_brightness_proxy;
++  gboolean       has_brightness_control;
+ 
+   GDBusProxy    *power_profiles_proxy;
+   guint          power_profiles_prop_id;
+@@ -292,7 +293,8 @@ als_enabled_state_changed (CcPowerPanel *self)
+   g_debug ("ALS enabled: %s", enabled ? "on" : "off");
+   g_signal_handlers_block_by_func (self->als_row, als_row_changed_cb, self);
+   adw_switch_row_set_active (self->als_row, enabled);
+-  gtk_widget_set_visible (GTK_WIDGET (self->als_row), visible && self->has_brightness);
++  gtk_widget_set_visible (GTK_WIDGET (self->als_row),
++                          visible && self->has_brightness_control);
+   g_signal_handlers_unblock_by_func (self->als_row, als_row_changed_cb, self);
+ }
+ 
+@@ -553,33 +555,19 @@ can_suspend_or_hibernate (CcPowerPanel *self,
+ }
+ 
+ static void
+-got_brightness_cb (GObject      *source_object,
+-                   GAsyncResult *res,
+-                   gpointer      user_data)
++shell_brightness_changed_cb (CcPowerPanel *self)
+ {
+-  g_autoptr(GVariant) result = NULL;
+-  g_autoptr(GError) error = NULL;
+-  gint32 brightness = -1.0;
+-  CcPowerPanel *self;
++  g_autoptr(GVariant) v =
++    g_dbus_proxy_get_cached_property (self->shell_brightness_proxy,
++                                      "HasBrightnessControl");
+ 
+-  result = g_dbus_connection_call_finish (G_DBUS_CONNECTION (source_object), res, &error);
+-  if (!result)
+-    {
+-      g_debug ("Failed to get Brightness property: %s", error->message);
+-      if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+-        return;
+-    }
++  if (v != NULL)
++    self->has_brightness_control = g_variant_get_boolean (v);
+   else
+-    {
+-      g_autoptr(GVariant) v = NULL;
+-      g_variant_get (result, "(v)", &v);
+-      brightness = v ? g_variant_get_int32 (v) : -1.0;
+-    }
+-
+-  self = user_data;
+-  self->has_brightness = brightness >= 0.0;
++    self->has_brightness_control = FALSE;
+ 
+-  gtk_widget_set_visible (GTK_WIDGET (self->dim_screen_row), self->has_brightness);
++  gtk_widget_set_visible (GTK_WIDGET (self->dim_screen_row),
++                          self->has_brightness_control);
+   als_enabled_state_changed (self);
+ }
+ 
+@@ -619,7 +607,6 @@ setup_suspend_delay_rows (CcPowerPanel *self)
+ static void
+ setup_power_saving (CcPowerPanel *self)
+ {
+-  g_autoptr(GDBusConnection) connection = NULL;
+   g_autoptr(GError) error = NULL;
+ 
+   /* ambient light sensor */
+@@ -633,33 +620,29 @@ setup_power_saving (CcPowerPanel *self)
+   g_signal_connect_object (self->gsd_settings, "changed",
+                            G_CALLBACK (als_enabled_setting_changed), self, G_CONNECT_SWAPPED);
+ 
+-  connection = g_bus_get_sync (G_BUS_TYPE_SESSION,
+-                               cc_panel_get_cancellable (CC_PANEL (self)),
+-                               &error);
+-  if (connection)
++  self->shell_brightness_proxy =
++    cc_object_storage_create_dbus_proxy_sync (G_BUS_TYPE_SESSION,
++                                              G_DBUS_PROXY_FLAGS_DO_NOT_CONNECT_SIGNALS |
++                                              G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
++                                              "org.gnome.Shell.Brightness",
++                                              "/org/gnome/Shell/Brightness",
++                                              "org.gnome.Shell.Brightness",
++                                              NULL,
++                                              &error);
++  if (!self->shell_brightness_proxy)
+     {
+-      g_dbus_connection_call (connection,
+-                              "org.gnome.SettingsDaemon.Power",
+-                              "/org/gnome/SettingsDaemon/Power",
+-                              "org.freedesktop.DBus.Properties",
+-                              "Get",
+-                              g_variant_new ("(ss)",
+-                                             "org.gnome.SettingsDaemon.Power.Screen",
+-                                             "Brightness"),
+-                              NULL,
+-                              G_DBUS_CALL_FLAGS_NONE,
+-                              -1,
+-                              cc_panel_get_cancellable (CC_PANEL (self)),
+-                              got_brightness_cb,
+-                              self);
++      g_warning ("Could not create Shell Brightness proxy: %s", error->message);
+     }
+   else
+     {
+-      if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+-        g_warning ("session bus not available: %s", error->message);
++      g_signal_connect_object (self->shell_brightness_proxy,
++                               "g-properties-changed",
++                               G_CALLBACK (shell_brightness_changed_cb),
++                               self,
++                               G_CONNECT_SWAPPED);
++      shell_brightness_changed_cb (self);
+     }
+ 
+-
+   g_settings_bind (self->gsd_settings, "idle-dim",
+                    self->dim_screen_row, "active",
+                    G_SETTINGS_BIND_DEFAULT);
+@@ -1151,6 +1134,7 @@ cc_power_panel_dispose (GObject *object)
+   if (self->iio_proxy_watch_id != 0)
+     g_bus_unwatch_name (self->iio_proxy_watch_id);
+   self->iio_proxy_watch_id = 0;
++  g_clear_object (&self->shell_brightness_proxy);
+ 
+   G_OBJECT_CLASS (cc_power_panel_parent_class)->dispose (object);
+ }
+-- 
+2.52.0
+
+
+From 7137003dcf905ded7aa259d008d78beb9dbae020 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Fri, 19 Dec 2025 13:04:26 +0100
+Subject: [PATCH 4/4] about: Hide "GNOME Version" row for partial GNOME rebase
+
+RHEL 10.2 will ship GNOME 49 and 47 components, so lets hide the
+"GNOME Version" row to avoid confusion.
+---
+ panels/system/about/cc-system-details-window.ui | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/panels/system/about/cc-system-details-window.ui b/panels/system/about/cc-system-details-window.ui
+index c1448ebb4..c5154d3fe 100644
+--- a/panels/system/about/cc-system-details-window.ui
++++ b/panels/system/about/cc-system-details-window.ui
+@@ -159,6 +159,7 @@
+                         <!-- GNOME Version -->
+                         <child>
+                           <object class="CcInfoEntry" id="gnome_version_row">
++                            <property name="visible">False</property>
+                             <property name="label" translatable="yes">GNOME Version</property>
+                           </object>
+                         </child>
+-- 
+2.52.0
+

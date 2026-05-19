@@ -1,0 +1,345 @@
+From 4a7759eac23ee28ecfb20e7db125713d3435bd20 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Thu, 19 Dec 2024 22:52:31 +0100
+Subject: [PATCH 1/2] display: Add API for configuring color mode
+
+Color modes here more or less means SDR vs HDR, which will be what the
+UI presents for now, but the underlying API is more flexible than a
+boolean.
+---
+ panels/display/cc-display-config-dbus.c | 59 +++++++++++++++++++++++++
+ panels/display/cc-display-config.c      | 29 ++++++++++++
+ panels/display/cc-display-config.h      | 16 +++++++
+ 3 files changed, 104 insertions(+)
+
+diff --git a/panels/display/cc-display-config-dbus.c b/panels/display/cc-display-config-dbus.c
+index bc27223a4..f9a4f0f01 100644
+--- a/panels/display/cc-display-config-dbus.c
++++ b/panels/display/cc-display-config-dbus.c
+@@ -20,6 +20,7 @@
+ #include <float.h>
+ #include <math.h>
+ #include <gio/gio.h>
++#include <stdint.h>
+ 
+ #include "cc-display-config-dbus.h"
+ 
+@@ -369,6 +370,9 @@ struct _CcDisplayMonitorDBus
+ 
+   gboolean supports_variable_refresh_rate;
+ 
++  CcDisplayColorMode color_mode;
++  GList *supported_color_modes;
++
+   CcDisplayLogicalMonitor *logical_monitor;
+ };
+ 
+@@ -671,6 +675,31 @@ cc_display_monitor_dbus_supports_variable_refresh_rate (CcDisplayMonitor *pself)
+   return self->supports_variable_refresh_rate;
+ }
+ 
++static GList *
++cc_display_monitor_dbus_get_supported_color_modes (CcDisplayMonitor *pself)
++{
++  CcDisplayMonitorDBus *self = CC_DISPLAY_MONITOR_DBUS (pself);
++
++  return self->supported_color_modes;
++}
++
++static CcDisplayColorMode
++cc_display_monitor_dbus_get_color_mode (CcDisplayMonitor *pself)
++{
++  CcDisplayMonitorDBus *self = CC_DISPLAY_MONITOR_DBUS (pself);
++
++  return self->color_mode;
++}
++
++static void
++cc_display_monitor_dbus_set_color_mode (CcDisplayMonitor   *pself,
++                                        CcDisplayColorMode  color_mode)
++{
++  CcDisplayMonitorDBus *self = CC_DISPLAY_MONITOR_DBUS (pself);
++
++  self->color_mode = color_mode;
++}
++
+ static gboolean
+ cc_display_monitor_dbus_supports_underscanning (CcDisplayMonitor *pself)
+ {
+@@ -909,6 +938,7 @@ cc_display_monitor_dbus_finalize (GObject *object)
+   g_free (self->display_name);
+ 
+   g_list_free_full (self->modes, g_object_unref);
++  g_list_free (self->supported_color_modes);
+ 
+   if (self->logical_monitor)
+     {
+@@ -948,6 +978,9 @@ cc_display_monitor_dbus_class_init (CcDisplayMonitorDBusClass *klass)
+   parent_class->get_id = cc_display_monitor_dbus_get_id;
+   parent_class->get_modes = cc_display_monitor_dbus_get_modes;
+   parent_class->supports_variable_refresh_rate = cc_display_monitor_dbus_supports_variable_refresh_rate;
++  parent_class->get_supported_color_modes = cc_display_monitor_dbus_get_supported_color_modes;
++  parent_class->get_color_mode = cc_display_monitor_dbus_get_color_mode;
++  parent_class->set_color_mode = cc_display_monitor_dbus_set_color_mode;
+   parent_class->supports_underscanning = cc_display_monitor_dbus_supports_underscanning;
+   parent_class->get_underscanning = cc_display_monitor_dbus_get_underscanning;
+   parent_class->set_underscanning = cc_display_monitor_dbus_set_underscanning;
+@@ -1063,6 +1096,26 @@ cc_display_monitor_dbus_new (GVariant *variant,
+         {
+           g_variant_get (v, "i", &self->min_refresh_rate);
+         }
++      else if (g_str_equal (s, "color-mode"))
++        {
++          uint32_t color_mode;
++
++          g_variant_get (v, "u", &color_mode);
++          self->color_mode = color_mode;
++        }
++      else if (g_str_equal (s, "supported-color-modes"))
++        {
++          g_autoptr (GVariantIter) iter = NULL;
++          uint32_t color_mode;
++
++          g_variant_get (v, "au", &iter);
++          while (g_variant_iter_next (iter, "u", &color_mode))
++            {
++              self->supported_color_modes =
++                g_list_append (self->supported_color_modes,
++                               GUINT_TO_POINTER (color_mode));
++            }
++        }
+     }
+ 
+   return self;
+@@ -1145,6 +1198,9 @@ build_monitors_variant (GHashTable *monitors)
+         continue;
+ 
+       g_variant_builder_init (&props_builder, G_VARIANT_TYPE ("a{sv}"));
++      g_variant_builder_add (&props_builder, "{sv}",
++                             "color-mode",
++                             g_variant_new_uint32 (monitor->color_mode));
+       g_variant_builder_add (&props_builder, "{sv}",
+                              "underscanning",
+                              g_variant_new_boolean (monitor->underscanning == UNDERSCANNING_ENABLED));
+@@ -1293,6 +1349,9 @@ cc_display_config_dbus_equal (CcDisplayConfig *pself,
+       if (!cc_display_mode_dbus_equal (CC_DISPLAY_MODE_DBUS (m1->current_mode),
+                                        CC_DISPLAY_MODE_DBUS (m2->current_mode)))
+         return FALSE;
++
++      if (m1->color_mode != m2->color_mode)
++        return FALSE;
+     }
+ 
+   return TRUE;
+diff --git a/panels/display/cc-display-config.c b/panels/display/cc-display-config.c
+index 2dd82ffdf..d803cca1d 100644
+--- a/panels/display/cc-display-config.c
++++ b/panels/display/cc-display-config.c
+@@ -351,6 +351,35 @@ cc_display_monitor_supports_variable_refresh_rate (CcDisplayMonitor *self)
+   return CC_DISPLAY_MONITOR_GET_CLASS (self)->supports_variable_refresh_rate (self);
+ }
+ 
++GList *
++cc_display_monitor_get_supported_color_modes (CcDisplayMonitor *self)
++{
++  return CC_DISPLAY_MONITOR_GET_CLASS (self)->get_supported_color_modes (self);
++}
++
++gboolean
++cc_display_monitor_supports_color_mode (CcDisplayMonitor   *self,
++                                        CcDisplayColorMode  color_mode)
++{
++  GList *supported_color_modes =
++    cc_display_monitor_get_supported_color_modes (self);
++
++  return !!g_list_find (supported_color_modes, GUINT_TO_POINTER (color_mode));
++}
++
++CcDisplayColorMode
++cc_display_monitor_get_color_mode (CcDisplayMonitor *self)
++{
++  return CC_DISPLAY_MONITOR_GET_CLASS (self)->get_color_mode (self);
++}
++
++void
++cc_display_monitor_set_color_mode (CcDisplayMonitor   *self,
++                                   CcDisplayColorMode  color_mode)
++{
++  CC_DISPLAY_MONITOR_GET_CLASS (self)->set_color_mode (self, color_mode);
++}
++
+ gboolean
+ cc_display_monitor_supports_underscanning (CcDisplayMonitor *self)
+ {
+diff --git a/panels/display/cc-display-config.h b/panels/display/cc-display-config.h
+index 320c6febd..706c78bae 100644
+--- a/panels/display/cc-display-config.h
++++ b/panels/display/cc-display-config.h
+@@ -82,6 +82,12 @@ typedef enum _CcDisplayModeRefreshRateMode
+   MODE_REFRESH_RATE_MODE_VARIABLE,
+ } CcDisplayModeRefreshRateMode;
+ 
++typedef enum _CcDisplayColorMode
++{
++  CC_DISPLAY_COLOR_MODE_DEFAULT = 0,
++  CC_DISPLAY_COLOR_MODE_BT2100 = 1,
++} CcDisplayColorMode;
++
+ #define CC_TYPE_DISPLAY_MODE (cc_display_mode_get_type ())
+ G_DECLARE_DERIVABLE_TYPE (CcDisplayMode, cc_display_mode,
+                           CC, DISPLAY_MODE, GObject)
+@@ -138,6 +144,10 @@ struct _CcDisplayMonitorClass
+                                                int               *h);
+   int               (*get_min_freq)           (CcDisplayMonitor  *self);
+   gboolean          (*supports_variable_refresh_rate) (CcDisplayMonitor  *self);
++  GList *           (*get_supported_color_modes) (CcDisplayMonitor *self);
++  CcDisplayColorMode (*get_color_mode)        (CcDisplayMonitor   *self);
++  void              (*set_color_mode)         (CcDisplayMonitor   *self,
++                                               CcDisplayColorMode  color_mode);
+   gboolean          (*supports_underscanning) (CcDisplayMonitor  *self);
+   gboolean          (*get_underscanning)      (CcDisplayMonitor  *self);
+   void              (*set_underscanning)      (CcDisplayMonitor  *self,
+@@ -240,6 +250,12 @@ void              cc_display_monitor_set_primary            (CcDisplayMonitor  *
+ guint32           cc_display_monitor_get_id                 (CcDisplayMonitor  *monitor);
+ 
+ gboolean          cc_display_monitor_supports_variable_refresh_rate (CcDisplayMonitor *self);
++GList *           cc_display_monitor_get_supported_color_modes (CcDisplayMonitor *monitor);
++gboolean          cc_display_monitor_supports_color_mode    (CcDisplayMonitor   *monitor,
++                                                             CcDisplayColorMode  color_mode);
++CcDisplayColorMode cc_display_monitor_get_color_mode        (CcDisplayMonitor   *monitor);
++void              cc_display_monitor_set_color_mode         (CcDisplayMonitor   *monitor,
++                                                             CcDisplayColorMode  color_mode);
+ gboolean          cc_display_monitor_supports_underscanning (CcDisplayMonitor  *monitor);
+ gboolean          cc_display_monitor_get_underscanning      (CcDisplayMonitor  *monitor);
+ void              cc_display_monitor_set_underscanning      (CcDisplayMonitor  *monitor,
+-- 
+2.53.0
+
+
+From 7c553a14250fdb8abd92781c6c5cd3ab09078518 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Jonas=20=C3=85dahl?= <jadahl@gmail.com>
+Date: Thu, 19 Dec 2024 22:58:10 +0100
+Subject: [PATCH 2/2] display: Add monitor HDR toggle
+
+This changes the switches between the 'default' and 'BT.2100' color
+mode. In practice, that means SDR (default) and HDR (BT.2100, which is
+the type of HDR we support).
+---
+ panels/display/cc-display-settings.c  | 32 +++++++++++++++++++++++++++
+ panels/display/cc-display-settings.ui |  8 +++++++
+ 2 files changed, 40 insertions(+)
+
+diff --git a/panels/display/cc-display-settings.c b/panels/display/cc-display-settings.c
+index 86043b51a..61f009606 100644
+--- a/panels/display/cc-display-settings.c
++++ b/panels/display/cc-display-settings.c
+@@ -58,6 +58,7 @@ struct _CcDisplaySettings
+   GtkWidget        *scale_bbox;
+   GtkWidget        *scale_buttons_row;
+   GtkWidget        *scale_combo_row;
++  AdwSwitchRow     *hdr_row;
+   AdwSwitchRow     *underscanning_row;
+ };
+ 
+@@ -387,6 +388,7 @@ cc_display_settings_rebuild_ui (CcDisplaySettings *self)
+       gtk_widget_set_visible (self->resolution_row, FALSE);
+       gtk_widget_set_visible (self->scale_combo_row, FALSE);
+       gtk_widget_set_visible (self->scale_buttons_row, FALSE);
++      gtk_widget_set_visible (GTK_WIDGET (self->hdr_row), FALSE);
+       gtk_widget_set_visible (GTK_WIDGET (self->underscanning_row), FALSE);
+ 
+       return G_SOURCE_REMOVE;
+@@ -400,6 +402,7 @@ cc_display_settings_rebuild_ui (CcDisplaySettings *self)
+   g_object_freeze_notify ((GObject*) self->preferred_refresh_rate_row);
+   g_object_freeze_notify ((GObject*) self->resolution_row);
+   g_object_freeze_notify ((GObject*) self->scale_combo_row);
++  g_object_freeze_notify ((GObject*) self->hdr_row);
+   g_object_freeze_notify ((GObject*) self->underscanning_row);
+ 
+   cc_display_monitor_get_geometry (self->selected_output, NULL, NULL, &width, &height);
+@@ -643,6 +646,13 @@ cc_display_settings_rebuild_ui (CcDisplaySettings *self)
+     }
+   cc_display_settings_refresh_layout (self, self->collapsed);
+ 
++  gtk_widget_set_visible (GTK_WIDGET (self->hdr_row),
++                          cc_display_monitor_supports_color_mode (self->selected_output,
++                                                                  CC_DISPLAY_COLOR_MODE_BT2100));
++  adw_switch_row_set_active (self->hdr_row,
++                             cc_display_monitor_get_color_mode (self->selected_output) ==
++                             CC_DISPLAY_COLOR_MODE_BT2100);
++
+   gtk_widget_set_visible (GTK_WIDGET (self->underscanning_row),
+                           cc_display_monitor_supports_underscanning (self->selected_output) &&
+                           !cc_display_config_is_cloning (self->config));
+@@ -658,6 +668,7 @@ cc_display_settings_rebuild_ui (CcDisplaySettings *self)
+   g_object_thaw_notify ((GObject*) self->preferred_refresh_rate_row);
+   g_object_thaw_notify ((GObject*) self->resolution_row);
+   g_object_thaw_notify ((GObject*) self->scale_combo_row);
++  g_object_thaw_notify ((GObject*) self->hdr_row);
+   g_object_thaw_notify ((GObject*) self->underscanning_row);
+   self->updating = FALSE;
+ 
+@@ -815,6 +826,25 @@ on_scale_selection_changed_cb (CcDisplaySettings *self)
+   g_signal_emit_by_name (G_OBJECT (self), "updated", self->selected_output);
+ }
+ 
++static void
++on_hdr_row_active_changed_cb (CcDisplaySettings *self)
++{
++  CcDisplayColorMode color_mode;
++
++  if (self->updating)
++    return;
++
++  if (adw_switch_row_get_active (self->hdr_row))
++    color_mode = CC_DISPLAY_COLOR_MODE_BT2100;
++  else
++    color_mode = CC_DISPLAY_COLOR_MODE_DEFAULT;
++
++  cc_display_monitor_set_color_mode (self->selected_output,
++                                     color_mode);
++
++  g_signal_emit_by_name (G_OBJECT (self), "updated", self->selected_output);
++}
++
+ static void
+ on_underscanning_row_active_changed_cb (CcDisplaySettings *self)
+ {
+@@ -950,6 +980,7 @@ cc_display_settings_class_init (CcDisplaySettingsClass *klass)
+   gtk_widget_class_bind_template_child (widget_class, CcDisplaySettings, scale_bbox);
+   gtk_widget_class_bind_template_child (widget_class, CcDisplaySettings, scale_buttons_row);
+   gtk_widget_class_bind_template_child (widget_class, CcDisplaySettings, scale_combo_row);
++  gtk_widget_class_bind_template_child (widget_class, CcDisplaySettings, hdr_row);
+   gtk_widget_class_bind_template_child (widget_class, CcDisplaySettings, underscanning_row);
+ 
+   gtk_widget_class_bind_template_callback (widget_class, on_enabled_row_active_changed_cb);
+@@ -958,6 +989,7 @@ cc_display_settings_class_init (CcDisplaySettingsClass *klass)
+   gtk_widget_class_bind_template_callback (widget_class, on_variable_refresh_rate_active_changed_cb);
+   gtk_widget_class_bind_template_callback (widget_class, on_resolution_selection_changed_cb);
+   gtk_widget_class_bind_template_callback (widget_class, on_scale_selection_changed_cb);
++  gtk_widget_class_bind_template_callback (widget_class, on_hdr_row_active_changed_cb);
+   gtk_widget_class_bind_template_callback (widget_class, on_underscanning_row_active_changed_cb);
+ }
+ 
+diff --git a/panels/display/cc-display-settings.ui b/panels/display/cc-display-settings.ui
+index 5cffb0424..0e54a43ae 100644
+--- a/panels/display/cc-display-settings.ui
++++ b/panels/display/cc-display-settings.ui
+@@ -78,6 +78,14 @@
+             </child>
+           </object>
+         </child>
++        <child>
++          <object class="AdwSwitchRow" id="hdr_row">
++            <property name="width_request">100</property>
++            <property name="title" translatable="yes">_HDR (High Dynamic Range)</property>
++            <property name="use-underline">True</property>
++            <signal name="notify::active" handler="on_hdr_row_active_changed_cb" swapped="yes"/>
++          </object>
++        </child>
+         <child>
+           <object class="AdwSwitchRow" id="underscanning_row">
+             <property name="width_request">100</property>
+-- 
+2.53.0
+

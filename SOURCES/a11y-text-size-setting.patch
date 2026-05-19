@@ -1,0 +1,338 @@
+From 41791e1dcf3c8e81b46db13265ff48598bdc9ef3 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Wed, 12 Nov 2025 10:36:16 +0100
+Subject: [PATCH] a11y: Add "Text Size" setting
+
+This allows for resizing the text of the interface to values larger
+than the previously hardcoded "Large Text".
+
+The intent of this setting is to ensure that visually rendered text,
+including controls and labels using text, can be made larger so that
+it can be read more easily by people with milder visual impairments,
+without requiring the use of assistive technology (such as a screen
+magnifier or screen reader). Users may benefit from scaling all
+content on the web page, but text is most critical.
+
+See also WCAG 2.0, criterion 1.4.4 - Resize text
+https://www.w3.org/TR/WCAG22/#resize-text
+
+Fixes https://gitlab.gnome.org/GNOME/gnome-control-center/-/issues/1648
+---
+ panels/universal-access/cc-ua-seeing-page.c  | 126 +++++++++++++++----
+ panels/universal-access/cc-ua-seeing-page.ui | 101 ++++++++++++++-
+ 2 files changed, 197 insertions(+), 30 deletions(-)
+
+diff --git a/panels/universal-access/cc-ua-seeing-page.c b/panels/universal-access/cc-ua-seeing-page.c
+index 7a84997b8..f14250506 100644
+--- a/panels/universal-access/cc-ua-seeing-page.c
++++ b/panels/universal-access/cc-ua-seeing-page.c
+@@ -36,6 +36,7 @@
+ # include "config.h"
+ #endif
+ 
++#include <math.h>
+ #include <glib/gi18n-lib.h>
+ 
+ #include "cc-list-row.h"
+@@ -50,7 +51,12 @@ struct _CcUaSeeingPage
+   AdwSwitchRow       *high_contrast_row;
+   AdwSwitchRow       *status_shapes_row;
+   GtkSwitch          *animation_effects_switch;
+-  AdwSwitchRow       *large_text_row;
++  CcListRow          *text_size_row;
++  GtkScale           *text_size_scale;
++  AdwDialog          *text_size_dialog;
++  GtkLabel           *text_size_preview_label;
++  GtkLabel           *text_size_label_small;
++  GtkLabel           *text_size_label_large;
+   CcListRow          *cursor_size_row;
+   AdwSwitchRow       *sound_keys_row;
+   AdwSwitchRow       *show_scrollbars_row;
+@@ -65,32 +71,76 @@ struct _CcUaSeeingPage
+ 
+ G_DEFINE_TYPE (CcUaSeeingPage, cc_ua_seeing_page, ADW_TYPE_NAVIGATION_PAGE)
+ 
+-static gboolean
+-get_large_text_mapping (GValue   *value,
+-                        GVariant *variant,
+-                        gpointer  user_data)
++
++static void
++set_label_scale (CcUaSeeingPage *self,
++                 GtkLabel       *label,
++                 double          scale)
+ {
+-  gdouble factor;
++  PangoContext *pango_ctx;
++  PangoFontDescription *font_desc;
++  double default_font_size;
++  g_autoptr(PangoAttribute) attr = NULL;
++  g_autoptr(PangoAttrList) new_attrs = NULL;
+ 
+-  factor = g_variant_get_double (variant);
+-  g_value_set_boolean (value, factor > DPI_FACTOR_NORMAL);
++  pango_ctx = gtk_widget_get_pango_context (GTK_WIDGET (label));
++  font_desc = pango_context_get_font_description (pango_ctx);
++
++  if (font_desc)
++    {
++      default_font_size = pango_font_description_get_size (font_desc);
++
++      /* We need absolute size without text scaling applied */
++      if (pango_font_description_get_size_is_absolute (font_desc))
++        default_font_size /= g_settings_get_double (self->interface_settings,
++                                                    KEY_TEXT_SCALING_FACTOR);
++      else
++        default_font_size *= 96.0 / 72; /* 96 dpi */
++    }
++  else
++    {
++      default_font_size = 11 * PANGO_SCALE * 96.0 / 72; /* Assuming 11 pt, 96 dpi */
++    }
+ 
+-  return TRUE;
++  attr = pango_attr_size_new_absolute (round (scale * default_font_size));
++  new_attrs = pango_attr_list_new ();
++  pango_attr_list_insert (new_attrs, g_steal_pointer (&attr));
++
++  gtk_label_set_attributes (label, new_attrs);
+ }
+ 
+-static GVariant *
+-set_large_text_mapping (const GValue       *value,
+-                        const GVariantType *expected_type,
+-                        gpointer            user_data)
++static void
++update_text_size_row_label (CcUaSeeingPage *self)
+ {
+-  GSettings *settings = user_data;
++  const gchar *label = NULL;
++  double text_scaling_factor;
+ 
+-  if (g_value_get_boolean (value))
+-    return g_variant_new_double (DPI_FACTOR_LARGE);
++  text_scaling_factor = g_settings_get_double (self->interface_settings,
++                                               KEY_TEXT_SCALING_FACTOR);
++  label = text_scaling_factor > DPI_FACTOR_NORMAL ? _("Large") : _("Default");
++  cc_list_row_set_secondary_label (self->text_size_row, label);
++}
+ 
+-  g_settings_reset (settings, KEY_TEXT_SCALING_FACTOR);
++static void
++apply_text_size_changes (CcUaSeeingPage *self)
++{
++  g_settings_set_double (self->interface_settings, KEY_TEXT_SCALING_FACTOR,
++                         gtk_range_get_value (GTK_RANGE (self->text_size_scale)));
++  adw_dialog_close (self->text_size_dialog);
+ 
+-  return NULL;
++  update_text_size_row_label (self);
++}
++
++static void
++ua_text_size_value_changed (GtkRange      *text_size_range,
++                            gpointer       user_data)
++{
++  CcUaSeeingPage *self = CC_UA_SEEING_PAGE (user_data);
++  double value = gtk_range_get_value (text_size_range);
++
++  gtk_range_set_value (text_size_range, value);
++
++  set_label_scale (self, self->text_size_preview_label, value);
+ }
+ 
+ static void
+@@ -146,6 +196,16 @@ ua_cursor_row_activated_cb (CcUaSeeingPage *self)
+   adw_dialog_present (dialog, GTK_WIDGET (self));
+ }
+ 
++static void
++ua_text_size_row_activated_cb (CcUaSeeingPage *self)
++{
++  /* Intiialize scale with the current value. */
++  gtk_range_set_value (GTK_RANGE (self->text_size_scale),
++                       g_settings_get_double (self->interface_settings,
++                                              KEY_TEXT_SCALING_FACTOR));
++  adw_dialog_present (self->text_size_dialog, GTK_WIDGET (self));
++}
++
+ static void
+ cc_ua_seeing_page_dispose (GObject *object)
+ {
+@@ -174,19 +234,30 @@ cc_ua_seeing_page_class_init (CcUaSeeingPageClass *klass)
+   gtk_widget_class_bind_template_child (widget_class, CcUaSeeingPage, high_contrast_row);
+   gtk_widget_class_bind_template_child (widget_class, CcUaSeeingPage, status_shapes_row);
+   gtk_widget_class_bind_template_child (widget_class, CcUaSeeingPage, animation_effects_switch);
+-  gtk_widget_class_bind_template_child (widget_class, CcUaSeeingPage, large_text_row);
+   gtk_widget_class_bind_template_child (widget_class, CcUaSeeingPage, cursor_size_row);
+   gtk_widget_class_bind_template_child (widget_class, CcUaSeeingPage, sound_keys_row);
+   gtk_widget_class_bind_template_child (widget_class, CcUaSeeingPage, show_scrollbars_row);
+ 
+   gtk_widget_class_bind_template_child (widget_class, CcUaSeeingPage, screen_reader_row);
+ 
++  gtk_widget_class_bind_template_child (widget_class, CcUaSeeingPage, text_size_dialog);
++  gtk_widget_class_bind_template_child (widget_class, CcUaSeeingPage, text_size_label_small);
++  gtk_widget_class_bind_template_child (widget_class, CcUaSeeingPage, text_size_label_large);
++  gtk_widget_class_bind_template_child (widget_class, CcUaSeeingPage, text_size_preview_label);
++  gtk_widget_class_bind_template_child (widget_class, CcUaSeeingPage, text_size_row);
++  gtk_widget_class_bind_template_child (widget_class, CcUaSeeingPage, text_size_scale);
++
+   gtk_widget_class_bind_template_callback (widget_class, ua_cursor_row_activated_cb);
++  gtk_widget_class_bind_template_callback (widget_class, ua_text_size_row_activated_cb);
++
++  gtk_widget_class_bind_template_callback (widget_class, apply_text_size_changes);
+ }
+ 
+ static void
+ cc_ua_seeing_page_init (CcUaSeeingPage *self)
+ {
++  g_type_ensure (CC_TYPE_LIST_ROW);
++
+   gtk_widget_init_template (GTK_WIDGET (self));
+ 
+   self->kb_settings = g_settings_new (KEYBOARD_SETTINGS);
+@@ -209,14 +280,15 @@ cc_ua_seeing_page_init (CcUaSeeingPage *self)
+                    self->animation_effects_switch, "active",
+                    G_SETTINGS_BIND_DEFAULT);
+ 
+-  /* Large Text */
+-  g_settings_bind_with_mapping (self->interface_settings, KEY_TEXT_SCALING_FACTOR,
+-                                self->large_text_row,
+-                                "active", G_SETTINGS_BIND_DEFAULT,
+-                                get_large_text_mapping,
+-                                set_large_text_mapping,
+-                                self->interface_settings,
+-                                NULL);
++  /* Text Size */
++  gtk_range_set_value (GTK_RANGE (self->text_size_scale),
++                       g_settings_get_double (self->interface_settings,
++                                              KEY_TEXT_SCALING_FACTOR));
++  g_signal_connect (GTK_RANGE (self->text_size_scale), "value-changed",
++                    G_CALLBACK (ua_text_size_value_changed), self);
++  update_text_size_row_label (self);
++  set_label_scale (self, self->text_size_label_small, 1.0);
++  set_label_scale (self, self->text_size_label_large, 2.0);
+ 
+   /* Sound Keys */
+   g_settings_bind (self->kb_settings, KEY_TOGGLEKEYS_ENABLED,
+diff --git a/panels/universal-access/cc-ua-seeing-page.ui b/panels/universal-access/cc-ua-seeing-page.ui
+index d2622d7cb..98fbd951e 100644
+--- a/panels/universal-access/cc-ua-seeing-page.ui
++++ b/panels/universal-access/cc-ua-seeing-page.ui
+@@ -61,10 +61,11 @@
+                 </child>
+ 
+                 <child>
+-                  <object class="AdwSwitchRow" id="large_text_row">
+-                    <property name="title" translatable="yes">_Large Text</property>
+-                    <property name="subtitle" translatable="yes">Increase the size of all text in the user interface</property>
++                  <object class="CcListRow" id="text_size_row">
++                    <property name="title" translatable="yes">_Text Size</property>
++                    <property name="show-arrow">True</property>
+                     <property name="use-underline">True</property>
++                    <signal name="activated" handler="ua_text_size_row_activated_cb" swapped="yes"/>
+                   </object>
+                 </child>
+ 
+@@ -100,4 +101,98 @@
+       </object>
+     </property>
+   </template>
++
++  <object class="AdwDialog" id="text_size_dialog">
++    <property name="title" translatable="yes">Text Size</property>
++    <property name="content-width">500</property>
++    <property name="height-request">360</property>
++    <property name="child">
++      <object class="AdwToolbarView">
++        <child type="top">
++          <object class="AdwHeaderBar">
++            <property name="show-start-title-buttons">false</property>
++            <property name="show-end-title-buttons">false</property>
++            <child type="start">
++              <object class="GtkButton">
++                <property name="label" translatable="yes">Cancel</property>
++                <signal name="clicked" handler="adw_dialog_close" object="text_size_dialog"/>
++              </object>
++            </child>
++            <child type="end">
++              <object class="GtkButton">
++                <property name="label" translatable="yes">Apply</property>
++                <signal name="clicked" handler="apply_text_size_changes" object="CcUaSeeingPage"/>
++                <style>
++                  <class name="suggested-action"/>
++                </style>
++              </object>
++            </child>
++          </object>
++        </child>
++        <property name="content">
++          <object class="AdwPreferencesPage">
++            <property name="description" translatable="yes">Use the slider to adjust the size of user interface text</property>
++            <property name="description-centered">true</property>
++            <child>
++              <object class="AdwPreferencesGroup">
++                <child>
++                  <object class="AdwPreferencesRow">
++                    <property name="activatable">false</property>
++                    <property name="child">
++                      <object class="GtkBox">
++                        <property name="spacing">10</property>
++                        <child>
++                          <object class="GtkLabel" id="text_size_label_small">
++                            <property name="label" translatable="yes">A</property>
++                            <property name="margin-start">20</property>
++                          </object>
++                        </child>
++                        <child>
++                          <object class="GtkScale" id="text_size_scale">
++                            <property name="margin-top">10</property>
++                            <property name="margin-bottom">10</property>
++                            <property name="hexpand">true</property>
++                            <property name="round-digits">2</property>
++                            <property name="adjustment">
++                              <object class="GtkAdjustment">
++                                <property name="lower">1</property>
++                                <property name="upper">2</property>
++                                <property name="value">1</property>
++                                <property name="step-increment">0.01</property>
++                                <property name="page-increment">0.05</property>
++                              </object>
++                            </property>
++                          </object>
++                        </child>
++                        <child>
++                          <object class="GtkLabel" id="text_size_label_large">
++                            <property name="label" translatable="yes">A</property>
++                            <property name="margin-end">20</property>
++                          </object>
++                        </child>
++                      </object>
++                    </property>
++                  </object>
++                </child>
++              </object>
++            </child>
++            <child>
++              <object class="AdwPreferencesGroup">
++                <child>
++                  <object class="GtkLabel" id="text_size_preview_label">
++                    <property name="vexpand">true</property>
++                    <property name="wrap">true</property>
++                    <property name="label" translatable="yes">Sample text</property>
++                    <style>
++                      <class name="dim-label"/>
++                    </style>
++                  </object>
++                </child>
++              </object>
++            </child>
++          </object>
++        </property>
++      </object>
++    </property>
++  </object>
+ </interface>
+-- 
+2.51.0
+
