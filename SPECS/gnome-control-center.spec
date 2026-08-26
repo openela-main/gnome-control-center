@@ -14,7 +14,7 @@
 
 Name:           gnome-control-center
 Version:        40.0
-Release:        44%{?dist}
+Release:        45%{?dist}
 Summary:        Utilities to configure the GNOME desktop
 
 License:        GPLv2+ and CC-BY-SA
@@ -88,6 +88,9 @@ Patch26:        subscription-manager-translations.patch
 
 # https://issues.redhat.com/browse/RHEL-4088
 Patch27:        0001-calibrator-Avoid-clearing-background.patch
+
+# https://redhat.atlassian.net/browse/RHEL-190440
+Patch28:        0001-wacom-Change-button-order-for-3-button-styli.patch
 
 BuildRequires:  chrpath
 BuildRequires:  cups-devel
@@ -278,6 +281,10 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gnome-control-center
 %dir %{_datadir}/gnome/wm-properties
 
 %changelog
+* Wed May 13 2026 Carlos Garnacho <cgarnach@redhat.com> - 40.0-45
+- Change button order for 3-button styli
+  Resolves: RHEL-190440
+
 * Mon Dec 22 2025 Carlos Garnacho <cgarnach@redhat.com> - 40.0-44
 - Fix graphical artifact in Wacom calibration UI
   Resolves: RHEL-4088

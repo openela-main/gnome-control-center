@@ -1,0 +1,125 @@
+From a8a267677fc0794f312560251617a646ba52fa2f Mon Sep 17 00:00:00 2001
+From: rpm-build <rpm-build>
+Date: Wed, 13 May 2026 17:57:39 +0200
+Subject: [PATCH] wacom: Change button order for 3-button styli
+
+The order is scrambled, relative to how they are assigned by
+the compositor/Xorg.
+---
+ panels/wacom/cc-wacom-stylus-page.c | 67 ++++++++++++++++++++---------
+ 1 file changed, 47 insertions(+), 20 deletions(-)
+
+diff --git a/panels/wacom/cc-wacom-stylus-page.c b/panels/wacom/cc-wacom-stylus-page.c
+index 2fc6c5a..6727b1d 100644
+--- a/panels/wacom/cc-wacom-stylus-page.c
++++ b/panels/wacom/cc-wacom-stylus-page.c
+@@ -157,16 +157,16 @@ button_changed_cb (CcWacomStylusPage *page)
+ {
+ 	GtkTreeIter		iter;
+ 	GtkListStore		*liststore;
+-	gint			mapping_b2,
+-				mapping_b3,
+-				mapping_b4;
++	gint			mapping_bottombutton,
++				mapping_topbutton,
++				mapping_thirdbutton;
+ 
+ 	if (!gtk_combo_box_get_active_iter (GTK_COMBO_BOX (WID ("combo-bottombutton")), &iter))
+ 		return;
+ 
+ 	liststore = GTK_LIST_STORE (WID ("liststore-buttons"));
+ 	gtk_tree_model_get (GTK_TREE_MODEL (liststore), &iter,
+-			    BUTTONNUMBER_COLUMN, &mapping_b2,
++			    BUTTONNUMBER_COLUMN, &mapping_bottombutton,
+ 			    -1);
+ 
+ 	if (cc_wacom_tool_get_num_buttons (page->stylus) > 1) {
+@@ -174,10 +174,10 @@ button_changed_cb (CcWacomStylusPage *page)
+ 			return;
+ 
+ 		gtk_tree_model_get (GTK_TREE_MODEL (liststore), &iter,
+-				    BUTTONNUMBER_COLUMN, &mapping_b3,
++				    BUTTONNUMBER_COLUMN, &mapping_topbutton,
+ 				    -1);
+ 	} else {
+-		mapping_b3 = 0;
++		mapping_topbutton = 0;
+ 	}
+ 
+ 	if (cc_wacom_tool_get_num_buttons (page->stylus) > 2) {
+@@ -185,15 +185,27 @@ button_changed_cb (CcWacomStylusPage *page)
+ 			return;
+ 
+ 		gtk_tree_model_get (GTK_TREE_MODEL (liststore), &iter,
+-				    BUTTONNUMBER_COLUMN, &mapping_b4,
++				    BUTTONNUMBER_COLUMN, &mapping_thirdbutton,
+ 				    -1);
+ 	} else {
+-		mapping_b4 = 0;
++		mapping_thirdbutton = 0;
+ 	}
+ 
+-	g_settings_set_enum (page->stylus_settings, "button-action", mapping_b2);
+-	g_settings_set_enum (page->stylus_settings, "secondary-button-action", mapping_b3);
+-	g_settings_set_enum (page->stylus_settings, "tertiary-button-action", mapping_b4);
++	if (cc_wacom_tool_get_num_buttons (page->stylus) >= 3) {
++		if (g_getenv ("GCC_ALTERNATIVE_STYLUS_MAPPING") == NULL) {
++			g_settings_set_enum (page->stylus_settings, "tertiary-button-action", mapping_topbutton);
++			g_settings_set_enum (page->stylus_settings, "secondary-button-action", mapping_bottombutton);
++			g_settings_set_enum (page->stylus_settings, "button-action", mapping_thirdbutton);
++		} else {
++			g_settings_set_enum (page->stylus_settings, "button-action", mapping_topbutton);
++			g_settings_set_enum (page->stylus_settings, "secondary-button-action", mapping_bottombutton);
++			g_settings_set_enum (page->stylus_settings, "tertiary-button-action", mapping_thirdbutton);
++		}
++	} else {
++		g_settings_set_enum (page->stylus_settings, "secondary-button-action", mapping_topbutton);
++		g_settings_set_enum (page->stylus_settings, "button-action", mapping_bottombutton);
++		g_settings_set_enum (page->stylus_settings, "tertiary-button-action", mapping_thirdbutton);
++	}
+ }
+ 
+ static void
+@@ -465,15 +477,30 @@ cc_wacom_stylus_page_new (CcWacomTool *stylus)
+ 
+ 	update_stylus_ui (page, layout);
+ 
+-	if (num_buttons >= 3)
+-		set_button_mapping_from_gsettings (GTK_COMBO_BOX (WID ("combo-thirdbutton")),
+-						   page->stylus_settings, "tertiary-button-action");
+-	if (num_buttons >= 2)
+-		set_button_mapping_from_gsettings (GTK_COMBO_BOX (WID ("combo-topbutton")),
+-						   page->stylus_settings, "secondary-button-action");
+-	if (num_buttons >= 1)
+-		set_button_mapping_from_gsettings (GTK_COMBO_BOX (WID ("combo-bottombutton")),
+-						   page->stylus_settings, "button-action");
++	if (num_buttons >= 3) {
++		if (g_getenv ("GCC_ALTERNATIVE_STYLUS_MAPPING") == NULL) {
++			set_button_mapping_from_gsettings (GTK_COMBO_BOX (WID ("combo-topbutton")),
++							   page->stylus_settings, "tertiary-button-action");
++			set_button_mapping_from_gsettings (GTK_COMBO_BOX (WID ("combo-bottombutton")),
++							   page->stylus_settings, "secondary-button-action");
++			set_button_mapping_from_gsettings (GTK_COMBO_BOX (WID ("combo-thirdbutton")),
++							   page->stylus_settings, "button-action");
++		} else {
++			set_button_mapping_from_gsettings (GTK_COMBO_BOX (WID ("combo-topbutton")),
++							   page->stylus_settings, "button-action");
++			set_button_mapping_from_gsettings (GTK_COMBO_BOX (WID ("combo-bottombutton")),
++							   page->stylus_settings, "secondary-button-action");
++			set_button_mapping_from_gsettings (GTK_COMBO_BOX (WID ("combo-thirdbutton")),
++							   page->stylus_settings, "tertiary-button-action");
++		}
++	} else {
++		if (num_buttons >= 2)
++			set_button_mapping_from_gsettings (GTK_COMBO_BOX (WID ("combo-topbutton")),
++							   page->stylus_settings, "secondary-button-action");
++		if (num_buttons >= 1)
++			set_button_mapping_from_gsettings (GTK_COMBO_BOX (WID ("combo-bottombutton")),
++							   page->stylus_settings, "button-action");
++	}
+ 	set_feel_from_gsettings (GTK_ADJUSTMENT (WID ("adjustment-tip-feel")),
+ 				 page->stylus_settings, "pressure-curve");
+ 
+-- 
+2.54.0
+
