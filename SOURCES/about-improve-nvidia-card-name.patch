@@ -1,0 +1,81 @@
+From 5a67feb0467a39392dc013307821872f47885cd4 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Mon, 27 Apr 2026 10:36:51 +0200
+Subject: [PATCH] info-overview: Backport NVIDIA GPU name fixes for
+ print-renderer
+
+When SwitcherooControl runs the print-renderer helper with DRI_PRIME, the
+NVIDIA proprietary GL stack may not honor that selection; the helper can
+then report a bogus GL_RENDERER and About falls back to a generic udev
+name (e.g. "NVIDIA Corporation").
+
+gnome-control-center-print-renderer (after querying GL_RENDERER), checks
+GL_VERSION for NVIDIA and invalidates the result when DRI_PRIME is set
+but __GLX_VENDOR_LIBRARY_NAME is not "nvidia", so we fall back to
+Switcheroo's device Name instead of a wrong renderer string.
+
+When spawning the helper, we should pass DISPLAY, WAYLAND_DISPLAY, and
+XDG_RUNTIME_DIR from the running process instead of relying on full
+inherited environment in all cases.
+
+Upstream:
+- 098adb5a75c78177d2958eb47e30c889eb613470 ("about: fix multiple GPU name
+display with NVIDIA GPU on Desktop PC", #3375)
+- 82bd9c71931cea251f06835b5d9bec7164468788 ("about: fix NVIDIA GPU name
+display if get_renderer_from_switcheroo failed", #3474)
+- 2b111f062e27137db59af698d37f2f02645b2fe2 ("system-details-window:
+Don't inherit env vars from parent")
+
+Adapted for GTK3 (gdk_window_create_gl_context).
+
+https://gitlab.gnome.org/GNOME/gnome-control-center/-/issues/3375
+https://gitlab.gnome.org/GNOME/gnome-control-center/-/issues/3474
+
+Resolves: RHEL-111572
+
+https://redhat.atlassian.net/browse/RHEL-111572
+---
+ .../about/gnome-control-center-print-renderer.c      | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/panels/system/about/gnome-control-center-print-renderer.c b/panels/system/about/gnome-control-center-print-renderer.c
+index ab72e7088..4e7e48cd7 100644
+--- a/panels/system/about/gnome-control-center-print-renderer.c
++++ b/panels/system/about/gnome-control-center-print-renderer.c
+@@ -22,6 +22,8 @@
+  *   Matthias Clasen <mclasen@redhat.com>
+  */
+ 
++#include <string.h>
++
+ #include <gtk/gtk.h>
+ #include <epoxy/gl.h>
+ 
+@@ -48,16 +50,22 @@ get_gtk_gles_renderer (void)
+         gdk_gl_context_clear_current ();
+         g_object_unref (context);
+ 
+-        if (strstr (gl_version, "NVIDIA") != NULL)
++        if (gl_version && strstr (gl_version, "NVIDIA") != NULL)
+           {
+             const char *glvnd_libname = g_getenv ("__GLX_VENDOR_LIBRARY_NAME");
+-            if (g_strcmp0 (glvnd_libname, "nvidia") != 0)
++            const char *dri_prime = g_getenv ("DRI_PRIME");
++            if (g_strcmp0 (glvnd_libname, "nvidia") != 0 && dri_prime != NULL)
+               {
+                 /* This helper is launched with parameters from a
+                  * non-NVIDIA GPU, but is running using a NVIDIA
+                  * library. As such, DRI_PRIME envvar from switcheroo
+                  * does not actually take effect, and the GPU name is
+                  * invalid.
++                 *
++                 * If there is no DRI_PRIME envvar, assume we failed to
++                 * use switcheroo to get GPU names, and this is called
++                 * with basic envvars listed in
++                 * cc-system-details-window.c:get_renderer_from_helper().
+                  */
+                 return NULL;
+               }
+-- 
+2.52.0
+

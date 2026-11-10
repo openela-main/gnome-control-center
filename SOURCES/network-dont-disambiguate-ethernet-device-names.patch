@@ -1,0 +1,75 @@
+From 2fdcd9e57f9557a21accfe9c8f44d327bd35548f Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Wed, 6 May 2026 09:33:52 +0200
+Subject: [PATCH] Don't disambiguate ethernet networks titles
+
+In RHEL-172249 and in RHEL-50729, customers want the ethernet
+device name to appear consistent regardless of the brand name of the
+device.
+
+What GNOME Settings upstream does is to use nm_device_disambiguate_names()
+so that it can show a simple "Wired" device when there's only one (usually
+embedded) device and still change the device name when there are multiple
+devices connected (corner case) to disambiguate.
+
+These changes make the Ethernet devices always appear as "Ethernet ($IFACE)",
+where $IFACE is the result of nm_device_get_iface ().
+
+See https://networkmanager.dev/docs/libnm/latest/NMDevice.html#nm-device-disambiguate-names
+
+Related: RHEL-50729
+Related: RHEL-172249
+---
+ panels/network/cc-network-panel.c | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
+
+diff --git a/panels/network/cc-network-panel.c b/panels/network/cc-network-panel.c
+index 3b19ed516..2ac980270 100644
+--- a/panels/network/cc-network-panel.c
++++ b/panels/network/cc-network-panel.c
+@@ -21,6 +21,7 @@
+ 
+ #include <config.h>
+ #include <stdlib.h>
++#include <glib/gi18n.h>
+ 
+ #include "shell/cc-object-storage.h"
+ 
+@@ -233,6 +234,18 @@ cc_network_panel_get_help_uri (CcPanel *panel)
+ 	return "help:gnome-help/net";
+ }
+ 
++static gchar *
++get_ethernet_device_name (NMDevice *device)
++{
++        const gchar *iface;
++
++        iface = nm_device_get_iface (device);
++        if (!iface)
++                return NULL;
++
++        return g_strdup_printf ("%s (%s)", _("Ethernet"), iface);
++}
++
+ static void
+ panel_refresh_device_titles (CcNetworkPanel *self)
+ {
+@@ -272,8 +285,13 @@ panel_refresh_device_titles (CcNetworkPanel *self)
+         for (i = 0; i < num_devices; i++) {
+                 if (NM_IS_DEVICE_BT (nm_devices[i]))
+                         adw_preferences_row_set_title (ADW_PREFERENCES_ROW (devices[i]), nm_device_bt_get_name (NM_DEVICE_BT (nm_devices[i])));
+-                else if (NET_IS_DEVICE_ETHERNET (devices[i]))
+-                        adw_preferences_group_set_title (ADW_PREFERENCES_GROUP (devices[i]), titles[i]);
++                else if (NET_IS_DEVICE_ETHERNET (devices[i])) {
++                        g_autofree gchar *device_name = NULL;
++
++                        device_name = get_ethernet_device_name (net_device_ethernet_get_device (NET_DEVICE_ETHERNET (devices[i])));
++                        adw_preferences_group_set_title (ADW_PREFERENCES_GROUP (devices[i]),
++                                                         device_name ? device_name : titles[i]);
++                }
+                 else if (NET_IS_DEVICE_MOBILE (devices[i]))
+                         net_device_mobile_set_title (NET_DEVICE_MOBILE (devices[i]), titles[i]);
+         }
+-- 
+2.52.0
+

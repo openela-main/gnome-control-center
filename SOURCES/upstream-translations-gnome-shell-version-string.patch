@@ -1,0 +1,464 @@
+From ccb7767bd9b0b9c8aebf43c7b66fa1c9df946441 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Mon, 7 Sep 2026 10:29:43 +0200
+Subject: [PATCH] Backport upstream translations for "GNOME Shell Version"
+ string
+
+Resolves: RHEL-193191
+---
+ po/be.po    | 4 ++++
+ po/bg.po    | 4 ++++
+ po/ca.po    | 4 ++++
+ po/cs.po    | 4 ++++
+ po/es.po    | 4 ++++
+ po/eu.po    | 4 ++++
+ po/fa.po    | 4 ++++
+ po/fi.po    | 4 ++++
+ po/fr.po    | 3 +++
+ po/gl.po    | 4 ++++
+ po/he.po    | 4 ++++
+ po/hu.po    | 4 ++++
+ po/id.po    | 4 ++++
+ po/it.po    | 4 ++++
+ po/ja.po    | 3 +++
+ po/ka.po    | 4 ++++
+ po/kk.po    | 4 ++++
+ po/ko.po    | 3 +++
+ po/lt.po    | 4 ++++
+ po/mjw.po   | 4 ++++
+ po/nb.po    | 4 ++++
+ po/nl.po    | 4 ++++
+ po/nn.po    | 4 ++++
+ po/oc.po    | 4 ++++
+ po/pl.po    | 4 ++++
+ po/pt_BR.po | 4 ++++
+ po/ro.po    | 4 ++++
+ po/ru.po    | 4 ++++
+ po/sl.po    | 4 ++++
+ po/sr.po    | 4 ++++
+ po/sv.po    | 4 ++++
+ po/tr.po    | 4 ++++
+ po/ug.po    | 4 ++++
+ po/uk.po    | 4 ++++
+ po/zh_CN.po | 3 +++
+ 35 files changed, 136 insertions(+)
+
+diff --git a/po/be.po b/po/be.po
+index 335c80757..b6929ade2 100644
+--- a/po/be.po
++++ b/po/be.po
+@@ -12772,3 +12772,7 @@ msgstr "Сістэмныя гукі"
+ 
+ #~ msgid "Invalid mobile class"
+ #~ msgstr "Няправільны мабільны клас"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Версія GNOME Shell"
+diff --git a/po/bg.po b/po/bg.po
+index 4c1dc299d..48bd6571f 100644
+--- a/po/bg.po
++++ b/po/bg.po
+@@ -10014,3 +10014,7 @@ msgstr[1] "%u входа"
+ #: subprojects/gvc/gvc-mixer-control.c:2872
+ msgid "System Sounds"
+ msgstr "Системни звуци"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Версия на GNOME Shell"
+diff --git a/po/ca.po b/po/ca.po
+index d29509f51..3fd3d532f 100644
+--- a/po/ca.po
++++ b/po/ca.po
+@@ -10078,3 +10078,7 @@ msgstr[1] "%u entrades"
+ #: subprojects/gvc/gvc-mixer-control.c:2872
+ msgid "System Sounds"
+ msgstr "Sons del sistema"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Versió del GNOME Shell"
+diff --git a/po/cs.po b/po/cs.po
+index f193fd3b5..689254a43 100644
+--- a/po/cs.po
++++ b/po/cs.po
+@@ -11959,3 +11959,7 @@ msgstr "Systémové zvuky"
+ 
+ #~ msgid "Primary Menu"
+ #~ msgstr "Hlavní nabídka"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Verze prostředí GNOME"
+diff --git a/po/es.po b/po/es.po
+index 92f27faac..57b605790 100644
+--- a/po/es.po
++++ b/po/es.po
+@@ -17654,3 +17654,7 @@ msgstr "Sonidos del sistema"
+ #~ msgid "No application with name '%s' registered a bookmark for '%s'"
+ #~ msgstr ""
+ #~ "Ninguna aplicación con el nombre «%s» registró un marcador para «%s»"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Versión de la shell de GNOME"
+diff --git a/po/eu.po b/po/eu.po
+index c389193a0..bf1e63ee9 100644
+--- a/po/eu.po
++++ b/po/eu.po
+@@ -12557,3 +12557,7 @@ msgstr "Sistemaren soinuak"
+ 
+ #~ msgid "Delete Background"
+ #~ msgstr "Ezabatu atzeko planoa"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "GNOME Shell bertsioa"
+diff --git a/po/fa.po b/po/fa.po
+index a8f1eceeb..1aeb796b4 100644
+--- a/po/fa.po
++++ b/po/fa.po
+@@ -10992,3 +10992,7 @@ msgstr "صداهای سامانه"
+ 
+ #~ msgid "Show the current position inside the song"
+ #~ msgstr "نمایش موقعیت حال درون آهنگ"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "نگارش پوستهٔ گنوم"
+diff --git a/po/fi.po b/po/fi.po
+index d073c9964..eab5b83ab 100644
+--- a/po/fi.po
++++ b/po/fi.po
+@@ -13732,3 +13732,7 @@ msgstr "Järjestelmän äänet"
+ 
+ #~ msgid "Sorry"
+ #~ msgstr "Virhe"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Gnome Shell -versio"
+diff --git a/po/fr.po b/po/fr.po
+index cecd349ba..4c1e6d318 100644
+--- a/po/fr.po
++++ b/po/fr.po
+@@ -10436,3 +10436,6 @@ msgstr "Sons système"
+ #~ msgid "Unable to find the domain. Maybe you misspelled it?"
+ #~ msgstr "Impossible de trouver ce domaine. Vérifiez son orthographe."
+ 
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Version du Shell de GNOME"
+diff --git a/po/gl.po b/po/gl.po
+index 3f9821957..6070757a9 100644
+--- a/po/gl.po
++++ b/po/gl.po
+@@ -10878,3 +10878,7 @@ msgstr "Sons do sistema"
+ 
+ #~ msgid "Unlock to add a user account."
+ #~ msgstr "Desbloquear para engadir unha conta de usuario."
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Versión da shell de GNOME"
+diff --git a/po/he.po b/po/he.po
+index fe7d404f7..ed730be68 100644
+--- a/po/he.po
++++ b/po/he.po
+@@ -16723,3 +16723,7 @@ msgstr "צלילי מערכת"
+ 
+ #~ msgid "Unknown login ID, the user database might be corrupted"
+ #~ msgstr "פרטי הגישה לא ידועים, ייתכן שמאגר המשתמשים שבור."
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "גרסת מעטפת GNOME"
+diff --git a/po/hu.po b/po/hu.po
+index 45228608d..769cd00d9 100644
+--- a/po/hu.po
++++ b/po/hu.po
+@@ -10217,3 +10217,7 @@ msgstr[1] "%u bemenet"
+ #: subprojects/gvc/gvc-mixer-control.c:2872
+ msgid "System Sounds"
+ msgstr "Rendszerhangok"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "GNOME Shell verziója"
+diff --git a/po/id.po b/po/id.po
+index f546ee9d9..91b32a4fe 100644
+--- a/po/id.po
++++ b/po/id.po
+@@ -9998,3 +9998,7 @@ msgstr[0] "%u Masukan"
+ #: subprojects/gvc/gvc-mixer-control.c:2872
+ msgid "System Sounds"
+ msgstr "Suara Sistem"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Versi Shell GNOME"
+diff --git a/po/it.po b/po/it.po
+index 13c9d8241..0215afc1c 100644
+--- a/po/it.po
++++ b/po/it.po
+@@ -10601,3 +10601,7 @@ msgstr "Suoni di sistema"
+ 
+ #~ msgid "Add Enterprise User"
+ #~ msgstr "Aggiungi utente aziendale"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Versione di GNOME Shell"
+diff --git a/po/ja.po b/po/ja.po
+index 7ed3015e1..21aa7b927 100644
+--- a/po/ja.po
++++ b/po/ja.po
+@@ -12323,3 +12323,6 @@ msgstr "システムのサウンド"
+ #~ msgid "Left Touchring Mode Switch"
+ #~ msgstr "左タッチホイールのモードスイッチ"
+ 
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "GNOME Shell のバージョン"
+diff --git a/po/ka.po b/po/ka.po
+index 6dc85ce4d..0149ecfe3 100644
+--- a/po/ka.po
++++ b/po/ka.po
+@@ -13913,3 +13913,7 @@ msgstr "სისტემური ხმები"
+ 
+ #~ msgid "Sets the default theme"
+ #~ msgstr "აყენებს ნაგულისხმევ გაფორმებას"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "GNOME Shell-ის ვერსია"
+diff --git a/po/kk.po b/po/kk.po
+index b93ac34da..b1cd114bc 100644
+--- a/po/kk.po
++++ b/po/kk.po
+@@ -14314,3 +14314,7 @@ msgstr "Жүйелік дыбыстар"
+ #, fuzzy
+ #~ msgid "<b>Open %s</b>"
+ #~ msgstr "А_шу..."
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "GNOME Shell нұсқасы"
+diff --git a/po/ko.po b/po/ko.po
+index 5af85efab..1b3f43d49 100644
+--- a/po/ko.po
++++ b/po/ko.po
+@@ -10339,3 +10339,6 @@ msgstr "시스템 사운드"
+ #~ msgid "1/2 Screen"
+ #~ msgstr "1/2 화면"
+ 
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "그놈 셸 버전"
+diff --git a/po/lt.po b/po/lt.po
+index 5809c0f40..6a8760c48 100644
+--- a/po/lt.po
++++ b/po/lt.po
+@@ -13809,3 +13809,7 @@ msgstr "Sistemos garsai"
+ 
+ #~ msgid "Sorry"
+ #~ msgstr "Atleiskite"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "GNOME apvalkalo versija"
+diff --git a/po/mjw.po b/po/mjw.po
+index 236ca8287..3ebbd177b 100644
+--- a/po/mjw.po
++++ b/po/mjw.po
+@@ -8134,3 +8134,7 @@ msgstr ""
+ 
+ #~ msgid "The username cannot start with a “-”."
+ #~ msgstr "Username pangcheng amek “-” ke longle."
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "GNOME Version"
+diff --git a/po/nb.po b/po/nb.po
+index 70c2889c6..c8c32bc8c 100644
+--- a/po/nb.po
++++ b/po/nb.po
+@@ -10589,3 +10589,7 @@ msgstr "Systemlyder"
+ 
+ #~ msgid "Power Saving Options"
+ #~ msgstr "Strømsparing"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "GNOME Shell-versjon"
+diff --git a/po/nl.po b/po/nl.po
+index d19fcbc9a..d999bd8e1 100644
+--- a/po/nl.po
++++ b/po/nl.po
+@@ -13613,3 +13613,7 @@ msgstr "Systeemgeluiden"
+ 
+ #~ msgid "Yes"
+ #~ msgstr "Ja"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "GNOME Shell-versie"
+diff --git a/po/nn.po b/po/nn.po
+index 03182a63d..9c3aa8d15 100644
+--- a/po/nn.po
++++ b/po/nn.po
+@@ -5259,3 +5259,7 @@ msgstr ""
+ 
+ #~ msgid "cd;dvd;usb;audio;video;disc;"
+ #~ msgstr "cd;dvd;usb;lyd;video;plate;"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Versjon av Gnome Shell"
+diff --git a/po/oc.po b/po/oc.po
+index 6006066fe..37ab42e74 100644
+--- a/po/oc.po
++++ b/po/oc.po
+@@ -14563,3 +14563,7 @@ msgstr "Sons sistèma"
+ 
+ #~ msgid "_Off"
+ #~ msgstr "_Désactivat"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Version del Shell de GNOME"
+diff --git a/po/pl.po b/po/pl.po
+index ae24ddeb5..c3ffae3fa 100644
+--- a/po/pl.po
++++ b/po/pl.po
+@@ -10094,3 +10094,7 @@ msgstr[2] "%u wejść"
+ #: subprojects/gvc/gvc-mixer-control.c:2872
+ msgid "System Sounds"
+ msgstr "Dźwięki systemowe"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Wersja powłoki GNOME"
+diff --git a/po/pt_BR.po b/po/pt_BR.po
+index 4d257b307..d9bb6b9e3 100644
+--- a/po/pt_BR.po
++++ b/po/pt_BR.po
+@@ -12445,3 +12445,7 @@ msgstr "Sons do sistema"
+ 
+ #~ msgid "Unlocking..."
+ #~ msgstr "Desbloqueando…"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Versão do GNOME Shell"
+diff --git a/po/ro.po b/po/ro.po
+index 227f46d25..3a66169d6 100644
+--- a/po/ro.po
++++ b/po/ro.po
+@@ -13775,3 +13775,7 @@ msgstr "Sunete de sistem"
+ 
+ #~ msgid "Contents"
+ #~ msgstr "Cuprins"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Versiunea de GNOME"
+diff --git a/po/ru.po b/po/ru.po
+index 885f4d616..d5652bdde 100644
+--- a/po/ru.po
++++ b/po/ru.po
+@@ -12299,3 +12299,7 @@ msgstr "Системные звуки"
+ 
+ #~ msgid "GNOME Settings Keyboard Panel"
+ #~ msgstr "Настройки Клавиатурной Панели GNOME"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Версия GNOME Shell"
+diff --git a/po/sl.po b/po/sl.po
+index a6527bb1b..3e73b5f66 100644
+--- a/po/sl.po
++++ b/po/sl.po
+@@ -10067,3 +10067,7 @@ msgstr[3] "%u vhodi"
+ #: subprojects/gvc/gvc-mixer-control.c:2872
+ msgid "System Sounds"
+ msgstr "Sistemski zvoki"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Različica GNOME Shell"
+diff --git a/po/sr.po b/po/sr.po
+index af564fb53..946b3a120 100644
+--- a/po/sr.po
++++ b/po/sr.po
+@@ -14053,3 +14053,7 @@ msgstr "Системски звуци"
+ 
+ #~ msgid "Estimated battery capacity: %s"
+ #~ msgstr "Процењени капацитет батерије: %s"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Издање Гномове шкољке"
+diff --git a/po/sv.po b/po/sv.po
+index 2e666fbe4..2f51ea149 100644
+--- a/po/sv.po
++++ b/po/sv.po
+@@ -13727,3 +13727,7 @@ msgstr "Systemljud"
+ 
+ #~ msgid "Turns off wireless devices"
+ #~ msgstr "Slå av trådlösa enheter"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "GNOME Shell-version"
+diff --git a/po/tr.po b/po/tr.po
+index 56edc0719..78e96505a 100644
+--- a/po/tr.po
++++ b/po/tr.po
+@@ -10013,3 +10013,7 @@ msgstr[0] "%u Girdi"
+ #: subprojects/gvc/gvc-mixer-control.c:2872
+ msgid "System Sounds"
+ msgstr "Sistem Sesleri"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "GNOME Kabuğu Sürümü"
+diff --git a/po/ug.po b/po/ug.po
+index 741e9eb36..705c00844 100644
+--- a/po/ug.po
++++ b/po/ug.po
+@@ -7719,3 +7719,7 @@ msgstr "بارلىق تەڭشەكلەر"
+ 
+ #~ msgid "DSL"
+ #~ msgstr "DSL"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "GNOME Shell نەشرى"
+diff --git a/po/uk.po b/po/uk.po
+index 879aaa8d1..88280cd1d 100644
+--- a/po/uk.po
++++ b/po/uk.po
+@@ -12867,3 +12867,7 @@ msgstr "Системні звуки"
+ #~ msgctxt "Battery power"
+ #~ msgid "Empty"
+ #~ msgstr "Вичерпано"
++
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "Версія GNOME Shell"
+diff --git a/po/zh_CN.po b/po/zh_CN.po
+index 6cdfe7122..7662aca24 100644
+--- a/po/zh_CN.po
++++ b/po/zh_CN.po
+@@ -13858,3 +13858,6 @@ msgstr "系统声音"
+ #~ msgid "Save Received Files to Downloads Folder"
+ #~ msgstr "将接收的文件保存到下载文件夹"
+ 
++#: panels/system/about/cc-system-details-window.ui:163
++msgid "GNOME Shell Version"
++msgstr "GNOME Shell 版本"
+-- 
+2.55.0
+

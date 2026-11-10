@@ -1,0 +1,213 @@
+From 3efd7c9fcec5270d1cdd8ca85276e8e8a8bbccb4 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Wed, 8 Apr 2026 12:23:36 +0200
+Subject: [PATCH] display: Add "Auto Rotate" row for devices with accelerometer
+
+Historically we hid the "Orientation" row when an accelerometer was
+present.
+
+Later, GNOME Shell acquired the "Auto Rotate" quick setting for
+devices with an accelerometer, but Settings never got its counterpart.
+
+Users of devices with accelerometer have questioned why the orientation
+is missing in Settings.
+
+These changes add an "Auto Rotate" setting that is only visible for
+devices with accelerometer. The "Orientation" row is sensitive when
+"Auto Rotate" is off.
+
+We don't want to allow users to change "Orientation" when "Auto
+Rotate" is ON, because that can create an inconsistency between
+what the Orientation row says and the physical state of the device.
+E.g., you set "Orientation" to "Portrait Right" and then rotate
+the device physically to its left side.
+
+The string "Auto Rotate" matches the one used in GNOME Shell.
+
+(cherry picked from commit b8bbb3f0d0f37241264da67096d3c6e0deececd8)
+---
+ panels/display/cc-display-settings.c  | 58 +++++++++++++++++++--------
+ panels/display/cc-display-settings.ui | 10 ++++-
+ 2 files changed, 50 insertions(+), 18 deletions(-)
+
+diff --git a/panels/display/cc-display-settings.c b/panels/display/cc-display-settings.c
+index 0d8ff0913..ad5c28347 100644
+--- a/panels/display/cc-display-settings.c
++++ b/panels/display/cc-display-settings.c
+@@ -21,7 +21,7 @@
+ 
+ #include <float.h>
+ #include <glib/gi18n.h>
+-#include <float.h>
++#include <gio/gio.h>
+ #include <math.h>
+ #include "cc-display-settings.h"
+ #include "cc-display-config.h"
+@@ -40,6 +40,7 @@ struct _CcDisplaySettings
+   gboolean          has_accelerometer;
+   CcDisplayConfig  *config;
+   CcDisplayMonitor *selected_output;
++  GSettings        *touchscreen_settings;
+ 
+   GListModel       *orientation_list;
+   GListStore       *refresh_rate_list;
+@@ -48,6 +49,7 @@ struct _CcDisplaySettings
+ 
+   GtkWidget        *enabled_listbox;
+   AdwSwitchRow     *enabled_row;
++  AdwSwitchRow     *auto_orientation_row;
+   GtkWidget        *orientation_row;
+   GtkWidget        *refresh_rate_row;
+   AdwExpanderRow   *refresh_rate_expander_row;
+@@ -88,25 +90,30 @@ static void on_scale_btn_active_changed_cb (CcDisplaySettings *self,
+                                             GtkWidget         *widget);
+ 
+ static gboolean
+-should_show_rotation (CcDisplaySettings *self)
++show_auto_rotate_row (CcDisplaySettings *self)
+ {
+-  gboolean supports_rotation;
+-
+-  supports_rotation = cc_display_monitor_supports_rotation (self->selected_output,
+-                                                            CC_DISPLAY_ROTATION_90 |
+-                                                            CC_DISPLAY_ROTATION_180 |
+-                                                            CC_DISPLAY_ROTATION_270);
++  return self->has_accelerometer &&
++         self->selected_output &&
++         cc_display_monitor_is_builtin (self->selected_output);
++}
+ 
+-  /* Doesn't support rotation at all */
+-  if (!supports_rotation)
+-    return FALSE;
++static void
++on_auto_orientation_changed_cb (CcDisplaySettings *self)
++{
++  gboolean auto_rotate = show_auto_rotate_row (self) &&
++                         adw_switch_row_get_active (self->auto_orientation_row);
+ 
+-  /* We can always rotate displays that aren't builtin */
+-  if (!cc_display_monitor_is_builtin (self->selected_output))
+-    return TRUE;
++  /* We don't allow changing orientation when "Auto Rotate" is ON. */
++  gtk_widget_set_sensitive (self->orientation_row, !auto_rotate);
++}
+ 
+-  /* Only offer rotation if there's no accelerometer */
+-  return !self->has_accelerometer;
++static gboolean
++should_show_rotation (CcDisplaySettings *self)
++{
++  return cc_display_monitor_supports_rotation (self->selected_output,
++                                               CC_DISPLAY_ROTATION_90 |
++                                               CC_DISPLAY_ROTATION_180 |
++                                               CC_DISPLAY_ROTATION_270);
+ }
+ 
+ static const gchar *
+@@ -389,6 +396,7 @@ cc_display_settings_rebuild_ui (CcDisplaySettings *self)
+   if (!self->config || !self->selected_output)
+     {
+       gtk_widget_set_visible (self->enabled_listbox, FALSE);
++      gtk_widget_set_visible (GTK_WIDGET (self->auto_orientation_row), FALSE);
+       gtk_widget_set_visible (self->orientation_row, FALSE);
+       gtk_widget_set_visible (self->refresh_rate_row, FALSE);
+       gtk_widget_set_visible (GTK_WIDGET (self->refresh_rate_expander_row), FALSE);
+@@ -414,6 +422,9 @@ cc_display_settings_rebuild_ui (CcDisplaySettings *self)
+ 
+   cc_display_monitor_get_geometry (self->selected_output, NULL, NULL, &width, &height);
+ 
++  gtk_widget_set_visible (GTK_WIDGET (self->auto_orientation_row),
++                          show_auto_rotate_row (self));
++
+   /* Selecte the first mode we can find if the monitor is disabled. */
+   current_mode = cc_display_monitor_get_mode (self->selected_output);
+   if (current_mode == NULL)
+@@ -481,6 +492,9 @@ cc_display_settings_rebuild_ui (CcDisplaySettings *self)
+       gtk_widget_set_visible (self->orientation_row, FALSE);
+     }
+ 
++  /* Sync orientation row sensitivity with Auto Rotate setting. */
++  on_auto_orientation_changed_cb (self);
++
+   /* Only show refresh rate if we are not in cloning mode. */
+   if (!cc_display_config_is_cloning (self->config))
+     {
+@@ -925,6 +939,7 @@ cc_display_settings_finalize (GObject *object)
+ 
+   g_clear_object (&self->config);
+ 
++  g_clear_object (&self->touchscreen_settings);
+   g_clear_object (&self->orientation_list);
+   g_clear_object (&self->refresh_rate_list);
+   g_clear_object (&self->resolution_list);
+@@ -977,6 +992,7 @@ cc_display_settings_class_init (CcDisplaySettingsClass *klass)
+ 
+   gtk_widget_class_bind_template_child (widget_class, CcDisplaySettings, enabled_listbox);
+   gtk_widget_class_bind_template_child (widget_class, CcDisplaySettings, enabled_row);
++  gtk_widget_class_bind_template_child (widget_class, CcDisplaySettings, auto_orientation_row);
+   gtk_widget_class_bind_template_child (widget_class, CcDisplaySettings, orientation_row);
+   gtk_widget_class_bind_template_child (widget_class, CcDisplaySettings, refresh_rate_row);
+   gtk_widget_class_bind_template_child (widget_class, CcDisplaySettings, refresh_rate_expander_row);
+@@ -991,6 +1007,7 @@ cc_display_settings_class_init (CcDisplaySettingsClass *klass)
+   gtk_widget_class_bind_template_child (widget_class, CcDisplaySettings, underscanning_row);
+ 
+   gtk_widget_class_bind_template_callback (widget_class, on_enabled_row_active_changed_cb);
++  gtk_widget_class_bind_template_callback (widget_class, on_auto_orientation_changed_cb);
+   gtk_widget_class_bind_template_callback (widget_class, on_orientation_selection_changed_cb);
+   gtk_widget_class_bind_template_callback (widget_class, on_refresh_rate_selection_changed_cb);
+   gtk_widget_class_bind_template_callback (widget_class, on_variable_refresh_rate_active_changed_cb);
+@@ -1007,6 +1024,13 @@ cc_display_settings_init (CcDisplaySettings *self)
+ 
+   gtk_widget_init_template (GTK_WIDGET (self));
+ 
++  self->touchscreen_settings = g_settings_new ("org.gnome.settings-daemon.peripherals.touchscreen");
++  g_settings_bind (self->touchscreen_settings,
++                   "orientation-lock",
++                   self->auto_orientation_row,
++                   "active",
++                   G_SETTINGS_BIND_DEFAULT | G_SETTINGS_BIND_INVERT_BOOLEAN);
++
+   self->orientation_list = G_LIST_MODEL (gtk_string_list_new (NULL));
+   self->refresh_rate_list = g_list_store_new (CC_TYPE_DISPLAY_MODE);
+   self->resolution_list = g_list_store_new (CC_TYPE_DISPLAY_MODE);
+@@ -1070,7 +1094,7 @@ cc_display_settings_set_has_accelerometer (CcDisplaySettings    *self,
+   self->has_accelerometer = has_accelerometer;
+ 
+   cc_display_settings_rebuild_ui (self);
+-  g_object_notify_by_pspec (G_OBJECT (self), props[PROP_CONFIG]);
++  g_object_notify_by_pspec (G_OBJECT (self), props[PROP_HAS_ACCELEROMETER]);
+ }
+ 
+ CcDisplayConfig*
+diff --git a/panels/display/cc-display-settings.ui b/panels/display/cc-display-settings.ui
+index 0e54a43ae..d7d2d19a7 100644
+--- a/panels/display/cc-display-settings.ui
++++ b/panels/display/cc-display-settings.ui
+@@ -27,6 +27,14 @@
+         <style>
+           <class name="boxed-list" />
+         </style>
++        <child>
++          <object class="AdwSwitchRow" id="auto_orientation_row">
++            <property name="width_request">100</property>
++            <property name="title" translatable="yes" context="display setting">_Auto Rotate</property>
++            <property name="use-underline">True</property>
++            <signal name="notify::active" handler="on_auto_orientation_changed_cb" swapped="yes"/>
++          </object>
++        </child>
+         <child>
+           <object class="AdwComboRow" id="orientation_row">
+             <property name="width_request">100</property>
+@@ -73,7 +81,7 @@
+                 <property name="width_request">100</property>
+                 <property name="title" translatable="yes">Re_fresh Rate</property>
+                 <property name="use-underline">True</property>
+-                <property name="selected" bind-source="refresh_rate_row" bind-flags="bidirectional"/>
++                <property name="selected" bind-source="refresh_rate_row" bind-property="selected" bind-flags="bidirectional"/>
+               </object>
+             </child>
+           </object>
+-- 
+2.52.0
+

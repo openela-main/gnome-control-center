@@ -1,0 +1,44 @@
+From 44619be1c01ea348406dbfdfd257bec86d57fc5f Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Wed, 29 Jul 2026 14:00:16 +0200
+Subject: [PATCH] users: Allow fingerprint management for remote users
+
+fprtind seems to work just fine for enterprise login too.
+
+Cherry-picked from 57b9f2ec29a5088a8b3dc6f81a28843f79045a35
+---
+ panels/system/users/cc-fingerprint-manager.c | 3 +--
+ panels/system/users/cc-user-page.c           | 2 +-
+ 2 files changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/panels/system/users/cc-fingerprint-manager.c b/panels/system/users/cc-fingerprint-manager.c
+index 07a50e7b9..781cf9690 100644
+--- a/panels/system/users/cc-fingerprint-manager.c
++++ b/panels/system/users/cc-fingerprint-manager.c
+@@ -554,8 +554,7 @@ cc_fingerprint_manager_update_state (CcFingerprintManager     *self,
+ 
+   g_return_if_fail (priv->current_task == NULL);
+ 
+-  if (act_user_get_uid (priv->user) != getuid () ||
+-      !act_user_is_local_account (priv->user))
++  if (act_user_get_uid (priv->user) != getuid ())
+     {
+       set_state (self, CC_FINGERPRINT_STATE_NONE);
+       return;
+diff --git a/panels/system/users/cc-user-page.c b/panels/system/users/cc-user-page.c
+index 6c009a86e..df50f7211 100644
+--- a/panels/system/users/cc-user-page.c
++++ b/panels/system/users/cc-user-page.c
+@@ -355,8 +355,8 @@ update_fingerprint_row_state (CcUserPage           *self,
+     CcFingerprintState state = cc_fingerprint_manager_get_state (manager);
+     gboolean visible = FALSE;
+ 
++    /* Fingerprint: show when self, enabled, and possible */
+     visible = (act_user_get_uid (self->user) == getuid () &&
+-               act_user_is_local_account (self->user) &&
+                (self->login_screen_settings &&
+                 g_settings_get_boolean (self->login_screen_settings,
+                                         "enable-fingerprint-authentication")));
+-- 
+2.55.0
+

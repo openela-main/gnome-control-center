@@ -1,0 +1,63 @@
+From ced6a698d6e7f063f40905a1059e349f5377532b Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Mon, 13 Jul 2026 12:07:20 +0200
+Subject: [PATCH] datetime: Sync subdialogs visibility with permissions
+
+We were hiding the dialogs when there was no permission to show them,
+but we were not reinstating their visibility once the panel gets unlocked.
+
+This goes mostly unnoticed because most users have administrator
+accounts, which don't require unlocking this panel.
+
+Lets bind the visibility to the row sensitivity so that we can ensure
+the permissions at one place only.
+
+Fixes #3555
+
+(cherry picked from commit 5a23ffe3db5604214c0f3f0d0386f5315edd4033)
+---
+ panels/system/datetime/cc-datetime-page.c  | 6 ------
+ panels/system/datetime/cc-datetime-page.ui | 6 ++++++
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/panels/system/datetime/cc-datetime-page.c b/panels/system/datetime/cc-datetime-page.c
+index f89c71554..6566f5e6f 100644
+--- a/panels/system/datetime/cc-datetime-page.c
++++ b/panels/system/datetime/cc-datetime-page.c
+@@ -548,12 +548,6 @@ on_permission_changed (CcDateTimePage *self)
+   gtk_widget_set_sensitive (GTK_WIDGET (self->auto_timezone_row), location_allowed && (allowed || tz_allowed));
+   gtk_widget_set_sensitive (GTK_WIDGET (self->datetime_row), allowed && !using_ntp);
+   gtk_widget_set_sensitive (GTK_WIDGET (self->timezone_row), (allowed || tz_allowed) && (!auto_timezone || !location_allowed));
+-
+-  /* Hide the subdialogs if we no longer have permissions */
+-  if (!allowed)
+-      gtk_widget_set_visible (GTK_WIDGET (self->datetime_dialog), FALSE);
+-  if (!allowed && !tz_allowed)
+-      gtk_widget_set_visible (GTK_WIDGET (self->timezone_dialog), FALSE);
+ }
+ 
+ static void
+diff --git a/panels/system/datetime/cc-datetime-page.ui b/panels/system/datetime/cc-datetime-page.ui
+index 8acb8d12c..f494f4016 100644
+--- a/panels/system/datetime/cc-datetime-page.ui
++++ b/panels/system/datetime/cc-datetime-page.ui
+@@ -2,10 +2,16 @@
+ <interface>
+ 
+   <object class="CcTzDialog" id="timezone_dialog">
++    <binding name="visible">
++      <lookup name="sensitive" type="CcListRow">timezone_row</lookup>
++    </binding>
+     <signal name="tz-selected" handler="panel_tz_selection_changed_cb" swapped="yes"/>
+   </object>
+ 
+   <object class="AdwDialog" id="datetime_dialog">
++    <binding name="visible">
++      <lookup name="sensitive" type="CcListRow">datetime_row</lookup>
++    </binding>
+     <property name="title" translatable="yes">Date &amp; Time</property>
+     <property name="content-width">430</property>
+     <property name="child">
+-- 
+2.52.0
+

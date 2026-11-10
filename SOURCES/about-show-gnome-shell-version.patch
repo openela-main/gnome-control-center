@@ -1,0 +1,151 @@
+From 6d63e2dfd5f1680fb74d90ae73bf6bb61c2a40e7 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Mon, 22 Jun 2026 11:06:08 +0200
+Subject: [PATCH] about: Show "GNOME Shell Version" instead of "GNOME Version"
+
+The previous version was vague and not very meaningful. GNOME Shell's
+version seems more useful for users (specially when using Shell
+extensions).
+---
+ .../system/about/cc-system-details-window.c   | 74 ++++++++++++++++++-
+ .../system/about/cc-system-details-window.ui  |  4 +-
+ 2 files changed, 72 insertions(+), 6 deletions(-)
+
+diff --git a/panels/system/about/cc-system-details-window.c b/panels/system/about/cc-system-details-window.c
+index 2dfd65d08..08bfedbf5 100644
+--- a/panels/system/about/cc-system-details-window.c
++++ b/panels/system/about/cc-system-details-window.c
+@@ -72,6 +72,9 @@ struct _CcSystemDetailsWindow
+   CcInfoEntry       *windowing_system_row;
+   CcInfoEntry       *virtualization_row;
+   CcInfoEntry       *kernel_row;
++
++  /* Cached version string */
++  char              *gnome_version_str;
+ };
+ 
+ G_DEFINE_TYPE (CcSystemDetailsWindow, cc_system_details_window, ADW_TYPE_DIALOG)
+@@ -599,6 +602,53 @@ system_details_window_setup_virt (CcSystemDetailsWindow *self)
+   set_virtualization_label (self, g_variant_get_string (inner, NULL));
+ }
+ 
++static void
++get_gnome_shell_version_cb (GObject      *source,
++                             GAsyncResult *res,
++                             gpointer      user_data)
++{
++  CcSystemDetailsWindow *self = CC_SYSTEM_DETAILS_WINDOW (user_data);
++  g_autoptr(GDBusProxy) proxy = NULL;
++  g_autoptr(GVariant) variant = NULL;
++  g_autoptr(GError) error = NULL;
++  const char *version;
++
++  proxy = g_dbus_proxy_new_for_bus_finish (res, &error);
++  if (error != NULL)
++    {
++      g_debug ("Unable to connect to GNOME Shell: %s", error->message);
++      return;
++    }
++
++  variant = g_dbus_proxy_get_cached_property (proxy, "ShellVersion");
++
++  if (!variant)
++    {
++      g_debug ("Unable to retrieve org.gnome.Shell.ShellVersion property");
++      return;
++    }
++
++  version = g_variant_get_string (variant, NULL);
++  self->gnome_version_str = g_strdup (version);
++
++  cc_info_entry_set_value (self->gnome_version_row, self->gnome_version_str);
++  gtk_widget_set_visible (GTK_WIDGET (self->gnome_version_row), TRUE);
++}
++
++static void
++get_gnome_version_string (CcSystemDetailsWindow *self)
++{
++  g_dbus_proxy_new_for_bus (G_BUS_TYPE_SESSION,
++                            G_DBUS_PROXY_FLAGS_NONE,
++                            NULL,
++                            "org.gnome.Shell",
++                            "/org/gnome/Shell",
++                            "org.gnome.Shell",
++                            NULL,
++                            get_gnome_shell_version_cb,
++                            self);
++}
++
+ static const char *
+ get_windowing_system (void)
+ {
+@@ -776,9 +826,12 @@ on_copy_button_clicked_cb (GtkWidget              *widget,
+   os_type_text = get_os_type ();
+   g_string_append_printf (result_str, "%s\n", os_type_text);
+ 
+-  g_string_append (result_str, "- ");
+-  system_details_window_title_print_padding ("**GNOME Version:**", result_str, 0);
+-  g_string_append_printf (result_str, "%s\n", MAJOR_VERSION);
++  if (self->gnome_version_str)
++    {
++      g_string_append (result_str, "- ");
++      system_details_window_title_print_padding ("**GNOME Shell Version:**", result_str, 0);
++      g_string_append_printf (result_str, "%s\n", self->gnome_version_str);
++    }
+ 
+   g_string_append (result_str, "- ");
+   system_details_window_title_print_padding (_("**Windowing System:**"), result_str, 0);
+@@ -850,7 +903,7 @@ system_details_window_setup_overview (CcSystemDetailsWindow *self)
+   os_type_text = get_os_type ();
+   cc_info_entry_set_value (self->os_type_row, os_type_text);
+ 
+-  cc_info_entry_set_value (self->gnome_version_row, MAJOR_VERSION);
++  get_gnome_version_string (self);
+ 
+   cc_info_entry_set_value (self->windowing_system_row, get_windowing_system ());
+ 
+@@ -870,10 +923,23 @@ unset_focus (CcSystemDetailsWindow *self)
+   adw_dialog_set_focus (ADW_DIALOG (self), NULL);
+ }
+ 
++static void
++cc_system_details_window_finalize (GObject *object)
++{
++  CcSystemDetailsWindow *self = CC_SYSTEM_DETAILS_WINDOW (object);
++
++  g_clear_pointer (&self->gnome_version_str, g_free);
++
++  G_OBJECT_CLASS (cc_system_details_window_parent_class)->finalize (object);
++}
++
+ static void
+ cc_system_details_window_class_init (CcSystemDetailsWindowClass *klass)
+ {
+   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS (klass);
++  GObjectClass *object_class = G_OBJECT_CLASS (klass);
++
++  object_class->finalize = cc_system_details_window_finalize;
+ 
+   gtk_widget_class_set_template_from_resource (widget_class, "/org/gnome/control-center/system/about/cc-system-details-window.ui");
+ 
+diff --git a/panels/system/about/cc-system-details-window.ui b/panels/system/about/cc-system-details-window.ui
+index c5154d3fe..14403431a 100644
+--- a/panels/system/about/cc-system-details-window.ui
++++ b/panels/system/about/cc-system-details-window.ui
+@@ -156,11 +156,11 @@
+                           </object>
+                         </child>
+ 
+-                        <!-- GNOME Version -->
++                        <!-- GNOME Shell Version -->
+                         <child>
+                           <object class="CcInfoEntry" id="gnome_version_row">
+                             <property name="visible">False</property>
+-                            <property name="label" translatable="yes">GNOME Version</property>
++                            <property name="label" translatable="yes">GNOME Shell Version</property>
+                           </object>
+                         </child>
+ 
+-- 
+2.52.0
+
