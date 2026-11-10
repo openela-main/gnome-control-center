@@ -1,0 +1,45 @@
+From 63a68ddea03b5e228560c947fb4574fa42156ff1 Mon Sep 17 00:00:00 2001
+From: Luciano da Silva Ribas <lucribas@users>
+Date: Thu, 22 Sep 2022 23:00:24 -0300
+Subject: [PATCH] network: Fixed Network profiles shown on wrong device
+
+Added missing interface name during network profile creation.
+
+Fixes #353
+
+Fixed issues from code review
+
+(cherry picked from commit ee53bfd8b6bbbd018fdd7a2b1ea33e5a44a1b43b)
+and
+(cherry picked from commit 3182b7019fa7f59a68b51835117cd60e78e6815a)
+---
+ panels/network/net-device-ethernet.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/panels/network/net-device-ethernet.c b/panels/network/net-device-ethernet.c
+index f7cd6ae6b..856595b1d 100644
+--- a/panels/network/net-device-ethernet.c
++++ b/panels/network/net-device-ethernet.c
+@@ -404,6 +404,7 @@ add_profile_button_clicked_cb (NetDeviceEthernet *self)
+         g_autofree gchar *id = NULL;
+         NetConnectionEditor *editor;
+         const GPtrArray *connections;
++        const char *iface;
+ 
+         connection = nm_simple_connection_new ();
+         sc = NM_SETTING_CONNECTION (nm_setting_connection_new ());
+@@ -421,6 +422,11 @@ add_profile_button_clicked_cb (NetDeviceEthernet *self)
+                       NM_SETTING_CONNECTION_AUTOCONNECT, TRUE,
+                       NULL);
+ 
++        iface = nm_device_get_iface (self->device);
++        g_object_set (sc,
++                      NM_SETTING_CONNECTION_INTERFACE_NAME, iface,
++                      NULL);
++
+         nm_connection_add_setting (connection, nm_setting_wired_new ());
+ 
+         editor = net_connection_editor_new (connection, self->device, NULL, self->client);
+-- 
+2.34.1
+

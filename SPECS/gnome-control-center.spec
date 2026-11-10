@@ -14,7 +14,7 @@
 
 Name:           gnome-control-center
 Version:        40.0
-Release:        45%{?dist}
+Release:        51%{?dist}
 Summary:        Utilities to configure the GNOME desktop
 
 License:        GPLv2+ and CC-BY-SA
@@ -89,8 +89,26 @@ Patch26:        subscription-manager-translations.patch
 # https://issues.redhat.com/browse/RHEL-4088
 Patch27:        0001-calibrator-Avoid-clearing-background.patch
 
-# https://redhat.atlassian.net/browse/RHEL-190440
-Patch28:        0001-wacom-Change-button-order-for-3-button-styli.patch
+# https://issues.redhat.com/browse/RHEL-135180
+Patch28:        region-set-system-wide-locale-from-user.patch
+
+# https://redhat.atlassian.net/browse/RHEL-111572
+Patch29:        info-overview-backport-nvidia-card-name-fixes.patch
+
+# https://redhat.atlassian.net/browse/RHEL-166751
+Patch30:        network-drop-WEP-support.patch
+
+# https://redhat.atlassian.net/browse/RHEL-4232
+Patch31:        wifi-allow-passwd-reveal-for-ws-sae.patch
+
+# https://redhat.atlassian.net/browse/RHEL-173845
+Patch32:        users-allow-fingerprint-auth-for-enterprise-users.patch
+
+# https://redhat.atlassian.net/browse/RHEL-146566
+Patch33:        0001-wacom-Change-button-order-for-3-button-styli.patch
+
+# https://issues.redhat.com/browse/RHEL-121793
+Patch34:        network-set-iface-name-explicitly.patch
 
 BuildRequires:  chrpath
 BuildRequires:  cups-devel
@@ -281,9 +299,33 @@ chrpath --delete $RPM_BUILD_ROOT%{_bindir}/gnome-control-center
 %dir %{_datadir}/gnome/wm-properties
 
 %changelog
-* Wed May 13 2026 Carlos Garnacho <cgarnach@redhat.com> - 40.0-45
+* Mon Aug 10 2026 Felipe Borges <feborges@redhat.com> - 40.0-51
+- Set network interface names explicitly
+  Resolves: RHEL-121793
+
+* Wed May 13 2026 Carlos Garnacho <cgarnach@redhat.com> - 40.0-50
 - Change button order for 3-button styli
-  Resolves: RHEL-190440
+  Resolves: RHEL-146566
+
+* Wed Jun 03 2026 Felipe Borges <feborges@redhat.com> - 40.0-49
+- Allow fingerprint management for enterprise users
+  Resolves: RHEL-173845
+
+* Mon Apr 27 2026 Felipe Borges <feborges@redhat.com> - 40.0.48
+- Fix Wi-Fi password reveal not working for WS-SAE security
+  Resolves: RHEL-4232
+
+* Mon Apr 20 2026 Felipe Borges <feborges@redhat.com> - 40.0-47
+- Drop WEP support
+  Resolves: RHEL-166751
+
+* Tue Apr 14 2026 Felipe Borges <feborges@redhat.com> - 40.0-46
+- Backport NVIDIA graphics card display name fixes
+  Resolves: RHEL-111572
+
+* Tue Feb 10 2026 Felipe Borges <feborges@redhat.com> - 40.0-45
+- Fix system locale not getting set from within user settings
+  Resolves: RHEL-135180
 
 * Mon Dec 22 2025 Carlos Garnacho <cgarnach@redhat.com> - 40.0-44
 - Fix graphical artifact in Wacom calibration UI

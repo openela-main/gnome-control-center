@@ -1,0 +1,43 @@
+From 57b9f2ec29a5088a8b3dc6f81a28843f79045a35 Mon Sep 17 00:00:00 2001
+From: Felipe Borges <felipeborges@gnome.org>
+Date: Wed, 3 Jun 2026 10:24:12 +0200
+Subject: [PATCH] users: Allow fingerprint management for remote users
+
+fprtind seems to work just fine for enterprise login too.
+---
+ panels/user-accounts/cc-fingerprint-manager.c | 3 +--
+ panels/user-accounts/cc-user-panel.c          | 3 +--
+ 2 files changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/panels/user-accounts/cc-fingerprint-manager.c b/panels/user-accounts/cc-fingerprint-manager.c
+index 07a50e7b9..781cf9690 100644
+--- a/panels/user-accounts/cc-fingerprint-manager.c
++++ b/panels/user-accounts/cc-fingerprint-manager.c
+@@ -554,8 +554,7 @@ cc_fingerprint_manager_update_state (CcFingerprintManager     *self,
+ 
+   g_return_if_fail (priv->current_task == NULL);
+ 
+-  if (act_user_get_uid (priv->user) != getuid () ||
+-      !act_user_is_local_account (priv->user))
++  if (act_user_get_uid (priv->user) != getuid ())
+     {
+       set_state (self, CC_FINGERPRINT_STATE_NONE);
+       return;
+diff --git a/panels/user-accounts/cc-user-panel.c b/panels/user-accounts/cc-user-panel.c
+index cf3b0e24a..a542ef134 100644
+--- a/panels/user-accounts/cc-user-panel.c
++++ b/panels/user-accounts/cc-user-panel.c
+@@ -893,9 +893,8 @@ show_user (ActUser *user, CcUserPanel *self)
+ 
+         gtk_label_set_label (self->language_button_label, name);
+ 
+-        /* Fingerprint: show when self, local, enabled, and possible */
++        /* Fingerprint: show when self, enabled, and possible */
+         show = (act_user_get_uid (user) == getuid() &&
+-                act_user_is_local_account (user) &&
+                 (self->login_screen_settings &&
+                  g_settings_get_boolean (self->login_screen_settings,
+                                          "enable-fingerprint-authentication")));
+-- 
+2.34.1
+
